@@ -153,6 +153,13 @@ export type Entity = {
 		rgb_signal?: Signal;
 		/** @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior */
 		color_mode?: number;
+
+		// Display panel
+		parameters: Array<{
+			condition: CircuitCondition;
+			icon: Signal;
+			text: string;
+		}>
 	};
 
 	/** used by lamp */

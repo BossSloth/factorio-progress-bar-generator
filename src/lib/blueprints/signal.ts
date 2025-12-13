@@ -1,5 +1,5 @@
 export type Signal = {
 	type?: string;
 	name: string;
-	quality?: string;
+	quality?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 };
