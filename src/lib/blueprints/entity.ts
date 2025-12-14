@@ -3,6 +3,7 @@ import { Color } from './color';
 import { ItemFilter } from './itemFilter';
 import { Operator } from './operator';
 import { Position } from './position';
+import { Quality } from './quality';
 import { Signal } from './signal';
 
 export type Entity = {
@@ -10,7 +11,7 @@ export type Entity = {
 	entity_number: number;
 	name: string;
 	position: Position;
-	quality?: string;
+	quality?: Quality;
 	direction?: number;
 	enable_logistics_while_moving?: boolean;
 	orientation?: number;
@@ -172,7 +173,7 @@ export type Entity = {
 	items?: Array<{
 		id: {
 			name: string;
-			quality?: string;
+			quality?: Quality;
 		};
 		items: {
 			in_inventory?: Array<{
@@ -186,7 +187,7 @@ export type Entity = {
 		};
 	}>;
 	recipe?: string;
-	recipe_quality?: string;
+	recipe_quality?: Quality;
 
 	// chest settings
 	/** 0-based */
@@ -226,7 +227,7 @@ export type Entity = {
 	/** used by splitter */
 	filter?: {
 		name: string;
-		quality?: string;
+		quality?: Quality;
 		comparator?: Comparator;
 	};
 	/** used by pump */
@@ -240,7 +241,7 @@ export type Entity = {
 				/** 1-based */
 				index: number;
 				name: string;
-				quality?: string;
+				quality?: Quality;
 				comparator?: Comparator;
 				count: number;
 				max_count?: number;
@@ -294,7 +295,7 @@ export type Entity = {
 	grid?: Array<{
 		equipment: {
 			name: string;
-			quality?: string;
+			quality?: Quality;
 		};
 		position: Position;
 	}>;

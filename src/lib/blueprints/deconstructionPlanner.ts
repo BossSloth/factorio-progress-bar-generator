@@ -1,5 +1,6 @@
 import { Comparator } from './circuitCondition';
 import { Icon } from './icon';
+import { Quality } from './quality';
 
 export type DeconstructionPlanner = {
 	deconstruction_planner: {
@@ -9,7 +10,7 @@ export type DeconstructionPlanner = {
 			tile_filter_mode?: number;
 			entity_filters?: {
 				name: string;
-				quality?: string;
+				quality?: Quality;
 				comparator?: Comparator;
 				/** 0-based */
 				index: number;

@@ -1,5 +1,6 @@
 import { Comparator } from './circuitCondition';
 import { Icon } from './icon';
+import { Quality } from './quality';
 
 export type UpgradePlanner = {
 	upgrade_planner: {
@@ -8,22 +9,22 @@ export type UpgradePlanner = {
 				from?: {
 					type: 'entity' | 'item';
 					name: string;
-					quality?: string;
+					quality?: Quality;
 					comparator?: Comparator;
 					module_filter?: {
 						name: string;
-						quality?: string;
+						quality?: Quality;
 						comparator?: Comparator;
 					};
 				};
 				to?: {
 					type: 'entity' | 'item';
 					name: string;
-					quality?: string;
+					quality?: Quality;
 					module_limit: number;
 					module_slots: Array<{
 						name: string;
-						quality?: string;
+						quality?: Quality;
 					}>;
 				};
 				/** 0-based */
