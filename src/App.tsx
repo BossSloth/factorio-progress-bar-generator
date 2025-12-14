@@ -1,99 +1,210 @@
 import { useEffect, useMemo, useState } from 'react';
 import './index.css';
-import { addEntity, createEmptyBlueprint, decodePlan, encodePlan, type Color, type Icon } from './lib/blueprints';
+import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon, type Signal } from './lib/blueprints';
 
-type LampInput = {
-	colorHex: string;
+type Quality = Signal['quality'];
+
+type BarPreset = {
+	id: string;
+	label: string;
+	fillChar: string;
+	emptyChar: string;
 };
 
-const clampLampCount = (n: number): number => {
-	if (!Number.isFinite(n)) return 1;
-	return Math.min(200, Math.max(1, Math.floor(n)));
+const BAR_PRESETS: BarPreset[] = [
+	{ id: 'blocks', label: 'Blocks', fillChar: '▎▌▊█', emptyChar: '░' },
+	{ id: 'dots', label: 'Dots', fillChar: '●', emptyChar: '○' },
+	{ id: 'hash', label: 'Hash', fillChar: '#', emptyChar: '-' },
+	{ id: 'lines', label: 'Lines', fillChar: '━', emptyChar: '─' },
+  { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '░' },
+];
+
+const clampInt = (n: number, min: number, max: number): number => {
+	if (!Number.isFinite(n)) return min;
+	return Math.min(max, Math.max(min, Math.floor(n)));
 };
 
 const normalizeHex = (value: string): string => {
 	const v = value.trim();
-	if (v.length === 0) return '#ffffff';
+	if (v.length === 0) return '#ff0000';
 	if (v.startsWith('#')) return v;
 	return `#${v}`;
 };
 
-const hexToColor = (hexInput: string): Color => {
-	const hex = normalizeHex(hexInput).replace('#', '');
-	const full =
-		hex.length === 3
-			? hex
-				.split('')
-				.map(ch => ch + ch)
-				.join('')
-			: hex.padEnd(6, '0').slice(0, 6);
+const qualityToTag = (quality: Quality): string => {
+	if (!quality) return '';
+	return `,quality=${quality}`;
+};
 
-	const r = Number.parseInt(full.slice(0, 2), 16) / 255;
-	const g = Number.parseInt(full.slice(2, 4), 16) / 255;
-	const b = Number.parseInt(full.slice(4, 6), 16) / 255;
-	return { r, g, b, a: 1 };
+const makeItemTag = (itemName: string, quality: Quality): string => {
+	return `[item=${itemName}${qualityToTag(quality)}]`;
+};
+
+const repeatChar = (char: string, count: number): string => {
+	if (count <= 0) return '';
+	return char.repeat(count);
+};
+
+const splitChars = (value: string): string[] => Array.from(value);
+
+const makeBar = (
+	percent: number,
+	maxPercent: number,
+	length: number,
+	fillScale: string[],
+	emptyChar: string
+): string => {
+	const clampedPercent = clampInt(percent, 0, maxPercent);
+	const safeFillScale = fillScale.length > 0 ? fillScale : ['█'];
+	const fullChar = safeFillScale[safeFillScale.length - 1] ?? '█';
+	const safeEmptyChar = emptyChar || '░';
+
+	const total = (clampedPercent / maxPercent) * length;
+	const fullCells = Math.floor(total);
+	const remainder = total - fullCells;
+
+	let partial = '';
+	if (remainder > 0 && fullCells < length) {
+		const scaleSteps = safeFillScale.length;
+		const partialIndex = Math.min(scaleSteps - 1, Math.max(0, Math.ceil(remainder * scaleSteps) - 1));
+		partial = safeFillScale[partialIndex] ?? '';
+	}
+
+	const remaining = length - fullCells - (partial ? 1 : 0);
+	return `${repeatChar(fullChar, fullCells)}${partial}${repeatChar(safeEmptyChar, remaining)}`;
+};
+
+const makeDisplayPanelText = (args: {
+	bar: string;
+	colorHex: string;
+	font: string;
+	itemTag: string;
+	percent: number;
+	trailingSpacer: string;
+}): string => {
+	return `[font=${args.font}][color=${args.colorHex}]${args.itemTag}${args.bar}${args.trailingSpacer}[/color][/font]${args.percent}%`;
+};
+
+const Checkbox = (props: {
+	checked: boolean;
+	onChange: (checked: boolean) => void;
+	label: string;
+}) => {
+	return (
+		<label className="checkbox-label">
+			<input type="checkbox" checked={props.checked} onChange={e => props.onChange(e.currentTarget.checked)} />
+			<div className="checkbox" />
+			<div>{props.label}</div>
+		</label>
+	);
 };
 
 export function App() {
-	const [lampCount, setLampCount] = useState<number>(10);
-	const [lamps, setLamps] = useState<LampInput[]>(() =>
-		Array.from({ length: 10 }, () => ({ colorHex: '#ffffff' }))
-	);
+	const [conditionItemName, setConditionItemName] = useState('automation-science-pack');
+	const [textItemName, setTextItemName] = useState('automation-science-pack');
+	const [syncItems, setSyncItems] = useState(true);
+	const [quality, setQuality] = useState<Quality>('uncommon');
+	const [barColorHex, setBarColorHex] = useState('#ff0000');
+	const [barPresetId, setBarPresetId] = useState<string>('blocks');
+	const [fillChar, setFillChar] = useState('█');
+	const [emptyChar, setEmptyChar] = useState('░');
+	const [barLength, setBarLength] = useState(28);
+	const [maxPercent, setMaxPercent] = useState(100);
+	const [font, setFont] = useState('technology-slot-level-font');
+	const [trailingSpacer, setTrailingSpacer] = useState('⠀');
+	const [previewPercent, setPreviewPercent] = useState(42);
 	const [copied, setCopied] = useState(false);
 
 	useEffect(() => {
-		const nextCount = clampLampCount(lampCount);
-		setLampCount(nextCount);
-		setLamps(prev => {
-			if (prev.length === nextCount) return prev;
-			if (prev.length < nextCount) {
-				return prev.concat(
-					Array.from({ length: nextCount - prev.length }, () => ({ colorHex: '#ffffff' }))
-				);
-			}
-			return prev.slice(0, nextCount);
-		});
-	}, [lampCount]);
+ 		if (!syncItems) return;
+ 		setTextItemName(conditionItemName);
+ 	}, [conditionItemName, syncItems]);
 
-  console.log(decodePlan('0eNrd3c9uo0YAx/F3oerN3mVgBmYs5UksKyIO2aBicDHJrhVF6pH/VS8999C+2D5JwWl3lcWJDf4hzUxkRcLm7+cw+hpheDJuwgd/mwRRaiyejGAdRztjsXwydsGnyAu79yJv4xsL4zbYbUNvP996kR8azzMjiG79L8aCPK9mhh+lQRr4L4seJvbX0cPmxk/aGWbHVzEztvGuXSqOuq20a7KI84HNjL2xmFObfWDtNm6DxF+/zMJnRrtzaRKH1zf+vfcYxEm33NZL2pWnfvKy7XaW22/rvAuSXXrdO5Jvi8zN7ji6Q0697vjNbmLTfZx2Kze+5n8fDnT9srrji6f+l3ZRY3nX7txV6q/voziMP+3nuzBO56H/6Ifz7qPVct2+n1z9dHdntn+rZZD6myvvIY03Xre/89068KO13+Ksf1l9/fMP5Ouv35YfD5tfLT8edsb8ud31C7WIRFrNpFoEoGVJpFVNqmUBtGyJtIpJtWyAFpVIK5tUiwK0mFxazXRaDKDlyKVVTaflALRcubSK6bRcgBaXSyubTosDtIR0Ws1EWgJRp6Z0XOVUeQqpeSKdVz6VF6LniSWdV/v6fRIvRNETW0avehIvRNMTKqNXOYkXouoJk9Ern8QL0fXEkdELMYT1vRBlT1xJvWq8F6LtCZfUq8R7IeqeCEm9crwXou8tU1Kvi78X9U+oIvreIvJ6VWAvyPl6S16vAuyF6HvLltcrA3sh+t6iUns1SC9E31tMaq8K6YXoe8uR2qtAeiH63nKl9sqQXoi+t7jsXg3MC9H3lpDdq4J5IfreNmX3ymGXACD63iaye409t9P3QvS9bSngVWO8IFfk2Ap4lRgvRN/bVAGvHOOF6HubKeA1agjreyH63nbU8KoBXoi+t101vEqAF6Lvba6GVw7wQvS9LdTwGj6E9b0QfU9NZbyqSy9aRfQ9Jcp4FZd6IfqeWsp4ZZd6Ifqe2ip5NRd5Qa65pyp5VRd5IfqeMpW8iou8EH1PHZW8sou8EH1PXcW8mvFeiL6nXDGvarwXou+pUMyrGO+F6HtGFPM6+4tR/2dWiF5llnpe9UgvRK8yWz2vcqQXolcZVc8rH+kF+ZUoU8/rvCGs74XoVeYo6VWP8UL0KnOV9CrHeCF6lXElvfIxXoheZUJJrzOGsL4XolcdU1WvevAP3RHnox2iqlcx2AvR946lqlc22AvR946tsFczzAvR9w5V2Ksa5oXoe4cp7FUM84LcB8ZR2Csb5oXoe8dV26sZ4IXoe4er7VUN8EL0vSPU9ioGeCH63jXV9soG3JoJ0fcuUd6rPtcL0feupbxXea4Xou9dW3mv/FwvRN+7VHmvN87t9L0Qfe8yHbzqs7wQfe86OniVZ3lB7vTo6uCVn+WF6HuX6+B1bAjreyH63hWaeNWnvRB9z01NvMrTNxNF9D0nmnhlp70Qfc8tfbyaE16Ivue2Pl7VCS9E33Oqj1dxwgvR95zp45Wd8EL0PXe08mre80L0PXe18qre84Lcy51r5VW854Xoey608sre80L0vTB182revP09ou8F0c2rfNML0ffC0s0rf9ML0ffC1s3r/3M7fS9E3wuqoVd93AvR94Jp6FUe90L0vXA09MqPeyH6Xrgaeh2GsL4Xou8F19OrPuIFeVqT0NOrPOKFeV5TP/D/0QEs6z2tqcv7VbvvXvjZ2++ud/fxZ2ORJg9+9yTdH55nm+633VEHt8as+/f6+GfGrw9eGKT7+Sv6/95sZ47iZON1T9p9BXtlPHdb6gjaqe/P/50Zj+1mDythjiWoEIwTWwiTPj//C9xot/A='
+	useEffect(() => {
+		const preset = BAR_PRESETS.find(p => p.id === barPresetId);
+		if (!preset) return;
+		setFillChar(preset.fillChar);
+		setEmptyChar(preset.emptyChar);
+	}, [barPresetId]);
 
-  ))
+	const recommendedBarLength = useMemo(() => {
+		const safeMaxPercent = clampInt(maxPercent+2, 1, 1000);
+		const fillScaleLength = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0).length || 1;
+		return Math.ceil(safeMaxPercent / fillScaleLength);
+	}, [fillChar, maxPercent]);
 
 	const blueprintString = useMemo(() => {
+		const comparator: Comparator = '≤';
+		const safeMaxPercent = clampInt(maxPercent, 1, 1000);
+		const safeBarLength = clampInt(barLength, 1, 120);
+
+		const safeBarColor = normalizeHex(barColorHex);
+		const safeFillScale = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0);
+		const safeEmptyChar = (splitChars(emptyChar.trim()).find(ch => ch.trim().length > 0) ?? '░');
+		const safeConditionItem = conditionItemName.trim() || 'automation-science-pack';
+		const safeTextItem = (syncItems ? safeConditionItem : textItemName.trim()) || safeConditionItem;
+		const itemTag = makeItemTag(safeTextItem, quality);
+
 		const blueprint = createEmptyBlueprint();
-		blueprint.blueprint.label = 'Lamp colors';
+		blueprint.blueprint.label = `Progress bar: ${safeTextItem}`;
 
 		const icons: Icon[] = [
-			{
-				signal: { type: 'item', name: 'small-lamp' },
-				index: 1,
-			},
+			{ index: 1, signal: { name: 'display-panel' } },
+			{ index: 2, signal: { type: 'item', name: safeTextItem, quality } },
 		];
 		blueprint.blueprint.icons = icons;
 
-		const cols = Math.max(1, Math.ceil(Math.sqrt(lamps.length)));
-		for (let i = 0; i < lamps.length; i++) {
-			const row = Math.floor(i / cols);
-			const col = i % cols;
-			addEntity(blueprint, {
-				name: 'small-lamp',
-				position: { x: col * 2, y: row * 2 },
-				always_on: true,
-				color: hexToColor(lamps[i]?.colorHex ?? '#ffffff'),
-			});
-		}
+		addEntity(blueprint, {
+			name: 'display-panel',
+			position: { x: 0, y: 0 },
+			always_show: true,
+			direction: 8,
+			control_behavior: {
+				parameters: Array.from({ length: safeMaxPercent + 1 }, (_, percent) => {
+					const bar = makeBar(percent, safeMaxPercent, safeBarLength, safeFillScale, safeEmptyChar);
+					return {
+						text: makeDisplayPanelText({
+							bar,
+							colorHex: safeBarColor,
+							font,
+							itemTag,
+							percent,
+							trailingSpacer,
+						}),
+						icon: { name: safeTextItem, quality },
+						condition: {
+							comparator,
+							constant: percent,
+							first_signal: { name: safeConditionItem, quality },
+						},
+					};
+				}),
+			},
+		});
 
 		return encodePlan(blueprint);
-	}, [lamps]);
+	}, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, font, maxPercent, previewPercent, quality, syncItems, textItemName, trailingSpacer]);
 
-	const setLampColor = (index: number, colorHex: string) => {
-		setLamps(prev => {
-			if (index < 0 || index >= prev.length) return prev;
-			const next = prev.slice();
-			next[index] = { ...next[index], colorHex: normalizeHex(colorHex) };
-			return next;
+	const previewText = useMemo(() => {
+		const safeMaxPercent = clampInt(maxPercent, 1, 1000);
+		const safeBarLength = clampInt(barLength, 1, 120);
+		const safePercent = clampInt(previewPercent, 0, safeMaxPercent);
+		const safeBarColor = normalizeHex(barColorHex);
+		const safeFillScale = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0);
+		const safeEmptyChar = (splitChars(emptyChar.trim()).find(ch => ch.trim().length > 0) ?? '░');
+		const safeConditionItem = conditionItemName.trim() || 'automation-science-pack';
+		const safeTextItem = (syncItems ? safeConditionItem : textItemName.trim()) || safeConditionItem;
+		const itemTag = makeItemTag(safeTextItem, quality);
+		const bar = makeBar(safePercent, safeMaxPercent, safeBarLength, safeFillScale, safeEmptyChar);
+		return makeDisplayPanelText({
+			bar,
+			colorHex: safeBarColor,
+			font,
+			itemTag,
+			percent: safePercent,
+			trailingSpacer,
 		});
-	};
+	}, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, font, maxPercent, previewPercent, quality, syncItems, textItemName, trailingSpacer]);
 
 	const copy = async () => {
 		await navigator.clipboard.writeText(blueprintString);
@@ -105,8 +216,8 @@ export function App() {
 		<div className="container">
 			<div className="container-inner">
 				<div className="panel">
-					<h2>Lamp Blueprint Generator (test)</h2>
-					<p>Set lamp count + colors and copy the generated blueprint string.</p>
+					<h2>Progress Bar Generator</h2>
+					<p>Generates a display panel blueprint with conditional text for each percent.</p>
 				</div>
 
 				<div className="panels2">
@@ -114,46 +225,128 @@ export function App() {
 						<div className="panel">
 							<h3>Settings</h3>
 							<dl className="panel-hole">
-								<dt>Lamp count</dt>
+								<dt>Condition item</dt>
 								<dd>
 									<input
 										type="text"
-										value={String(lampCount)}
-										onChange={e => setLampCount(Number(e.currentTarget.value))}
-										placeholder="10"
+										value={conditionItemName}
+										onChange={e => setConditionItemName(e.currentTarget.value)}
+										placeholder="automation-science-pack"
 									/>
 								</dd>
+
+								<dt>Text item</dt>
+								<dd>
+									<input
+										type="text"
+										value={textItemName}
+										onChange={e => setTextItemName(e.currentTarget.value)}
+										disabled={syncItems}
+										placeholder="automation-science-pack"
+									/>
+								</dd>
+
+								<dt>Quality</dt>
+								<dd>
+									<select
+										className="button"
+										value={quality ?? ''}
+										onChange={e => setQuality((e.currentTarget.value || undefined) as Quality)}
+									>
+										<option value="">none</option>
+										<option value="common">common</option>
+										<option value="uncommon">uncommon</option>
+										<option value="rare">rare</option>
+										<option value="epic">epic</option>
+										<option value="legendary">legendary</option>
+									</select>
+								</dd>
+
+								<dt>Bar color</dt>
+								<dd>
+									<input
+										type="text"
+										value={barColorHex}
+										onChange={e => setBarColorHex(e.currentTarget.value)}
+										placeholder="#ff0000"
+									/>
+								</dd>
+
+								<dt>Bar length</dt>
+								<dd>
+									<input
+										type="text"
+										value={String(barLength)}
+										onChange={e => setBarLength(Number(e.currentTarget.value))}
+										placeholder="28"
+									/>
+									<div className="smaller mt8">Recommended: {recommendedBarLength}</div>
+								</dd>
+
+								<dt>Max percent</dt>
+								<dd>
+									<input
+										type="text"
+										value={String(maxPercent)}
+										onChange={e => setMaxPercent(Number(e.currentTarget.value))}
+										placeholder="100"
+									/>
+								</dd>
+
+								<dt>Bar style</dt>
+								<dd>
+									<select
+										className="button"
+										value={barPresetId}
+										onChange={e => setBarPresetId(e.currentTarget.value)}
+									>
+										{BAR_PRESETS.map(p => (
+											<option key={p.id} value={p.id}>
+												{p.label}
+											</option>
+										))}
+									</select>
+								</dd>
+
+								<dt>Fill char</dt>
+								<dd>
+									<input type="text" value={fillChar} onChange={e => setFillChar(e.currentTarget.value)} />
+								</dd>
+
+								<dt>Empty char</dt>
+								<dd>
+									<input type="text" value={emptyChar} onChange={e => setEmptyChar(e.currentTarget.value)} />
+								</dd>
 							</dl>
-							<div className="mt8">
-								<button type="button" className="button" onClick={() => setLamps(prev => prev.map(() => ({ colorHex: '#ffffff' })))}>
-									Reset colors
-								</button>
-							</div>
+							<Checkbox checked={syncItems} onChange={setSyncItems} label="Keep condition item and text item in sync" />
 						</div>
 
 						<div className="panel">
-							<h3>Lamps</h3>
+							<h3>Preview</h3>
+							<dl className="panel-hole">
+								<dt>Preview percent</dt>
+								<dd>
+									<input
+										type="range"
+										value={String(previewPercent)}
+										onChange={e => setPreviewPercent(Number(e.currentTarget.value))}
+										placeholder="42"
+                    min={0}
+                    max={maxPercent}
+									/>
+                  <input
+                    type="text"
+                    value={String(previewPercent)}
+                    onChange={e => setPreviewPercent(Number(e.currentTarget.value))}
+                    placeholder="42"
+                    min={0}
+                    max={maxPercent}
+                  />
+								</dd>
+							</dl>
 							<div className="panel-hole">
 								<div className="panel-hole-inner">
-									<div className="columns-3">
-										{lamps.map((lamp, i) => (
-											<div key={i} className="mb8">
-												<div className="strong mb8">Lamp {i + 1}</div>
-												<input
-													type="text"
-													value={lamp.colorHex}
-													onChange={e => setLampColor(i, e.currentTarget.value)}
-													placeholder="#ff0000"
-												/>
-												<div className="mt8">
-													<div
-														className="panel-inset p4"
-														style={{ width: '100%', height: 24, backgroundColor: normalizeHex(lamp.colorHex) }}
-													/>
-												</div>
-											</div>
-										))}
-									</div>
+									<pre style={{ margin: 0 }}>{previewText}</pre>
 								</div>
 							</div>
 						</div>

@@ -3,3 +3,5 @@ export type Signal = {
 	name: string;
 	quality?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 };
+
+export type

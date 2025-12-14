@@ -154,13 +154,16 @@ export type Entity = {
 		/** @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior */
 		color_mode?: number;
 
-		// Display panel
-		parameters: Array<{
+		/** Display panel parameters */
+		parameters?: Array<{
 			condition: CircuitCondition;
 			icon: Signal;
 			text: string;
-		}>
+		}>;
 	};
+
+	/** used by display panel */
+	always_show?: boolean;
 
 	/** used by lamp */
 	always_on?: boolean;
