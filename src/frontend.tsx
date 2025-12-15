@@ -4,16 +4,17 @@
  *
  * It is included in `src/index.html`.
  */
-import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { createRoot } from 'react-dom/client';
+import { App } from './App';
 
-function start() {
-  const root = createRoot(document.getElementById("root")!);
+function start(): void {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const root = createRoot(document.getElementById('root')!);
   root.render(<App />);
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", start);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
 } else {
   start();
 }

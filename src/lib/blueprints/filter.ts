@@ -1,5 +1,5 @@
 import { Comparator } from './circuitCondition';
 
-export type Filter = {
-	comparator?: Comparator;
-};
+export interface Filter {
+  comparator?: Comparator;
+}

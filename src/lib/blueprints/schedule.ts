@@ -1,6 +1,6 @@
 import { ScheduleRecord } from './scheduleRecord';
 
-export type Schedule = {
-	locomotives: number[];
-	schedule: ScheduleRecord;
-};
+export interface Schedule {
+  locomotives: number[];
+  schedule: ScheduleRecord;
+}

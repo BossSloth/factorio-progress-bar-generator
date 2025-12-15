@@ -1,18 +1,19 @@
 #!/usr/bin/env bun
+/* eslint-disable no-await-in-loop */
 
-import { mkdir } from "fs/promises";
-import path from "path";
+import { mkdir } from 'fs/promises';
+import path from 'path';
 
-const WIKI_BASE = "https://wiki.factorio.com";
+const WIKI_BASE = 'https://wiki.factorio.com';
 const API_URL = `${WIKI_BASE}/api.php`;
 const INVENTORY_RAW_URL = `${WIKI_BASE}/Template:Inventory?action=raw`;
 
 interface InventoryItem {
-  title: string;
-  internalName: string | null;
   href: string;
   imgSrc: string;
   imgSrcset: string[];
+  internalName: string | null;
+  title: string;
 }
 
 interface InventoryRow {
@@ -20,9 +21,9 @@ interface InventoryRow {
 }
 
 interface InventoryTab {
-  name: string;
   iconSrc: string;
   iconSrcset: string[];
+  name: string;
   rows: InventoryRow[];
 }
 
@@ -30,20 +31,20 @@ interface InventoryData {
   tabs: InventoryTab[];
 }
 
-type MediaWikiParseResponse =
-  | {
-      parse: {
-        text: {
-          "*": string;
-        };
-      };
-    }
-  | {
-      error: {
-        info?: string;
-        code?: string;
+type MediaWikiParseResponse
+  = | {
+    parse: {
+      text: {
+        '*': string;
       };
     };
+  }
+  | {
+    error: {
+      info?: string;
+      code?: string;
+    };
+  };
 
 interface MediaWikiQueryResponse {
   query?: {
@@ -51,32 +52,34 @@ interface MediaWikiQueryResponse {
       string,
       {
         title?: string;
-        revisions?: Array<{
+        revisions?: {
           slots?: {
             main?: {
-              "*"?: string;
+              '*'?: string;
             };
           };
-        }>;
+        }[];
       }
     >;
   };
 }
 
 function absolutizeWikiUrl(url: string): string {
-  if (url.startsWith("//")) return `https:${url}`;
-  if (url.startsWith("/")) return `${WIKI_BASE}${url}`;
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return `${WIKI_BASE}${url}`;
+
   return url;
 }
 
 function rewriteSrcset(value: string): string[] {
   return value
-    .split(",")
-    .map(part => {
+    .split(',')
+    .map((part) => {
       const trimmed = part.trim();
-      const spaceIdx = trimmed.indexOf(" ");
+      const spaceIdx = trimmed.indexOf(' ');
       if (spaceIdx === -1) return absolutizeWikiUrl(trimmed);
       const url = trimmed.slice(0, spaceIdx);
+
       return absolutizeWikiUrl(url);
     });
 }
@@ -85,17 +88,20 @@ const TAB_INDEX_RE = /\btab-(\d+)\b/;
 const TAB_HEAD_INDEX_RE = /\btab-head-(\d+)\b/;
 
 function parseIndexFromClassName(className: string | null, re: RegExp): number | null {
-  if (!className) return null;
+  if (className === null) return null;
   const m = className.match(re);
-  if (!m?.[1]) return null;
+  if (m?.[1] === undefined) return null;
   const n = Number(m[1]);
+
   return Number.isFinite(n) ? n : null;
 }
 
 function getOrInitMap<K, V>(map: Map<K, V>, key: K, init: () => V): V {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   if (map.has(key)) return map.get(key)!;
   const created = init();
   map.set(key, created);
+
   return created;
 }
 
@@ -118,6 +124,7 @@ function* iterInventoryItems(data: InventoryData): Generator<InventoryItem> {
 function getUniqueItemTitles(data: InventoryData): string[] {
   const titles = new Set<string>();
   for (const item of iterInventoryItems(data)) titles.add(item.title);
+
   return [...titles];
 }
 
@@ -132,44 +139,47 @@ function padItemsToColumns(items: readonly InventoryItem[], columns: number): (I
   while (padded.length % columns !== 0) {
     padded.push(null);
   }
+
   return padded;
 }
 
 async function fetchText(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Fetch failed (${res.status}) for ${url}`);
-  return await res.text();
+
+  return res.text();
 }
 
 async function parseWikitextToHtml(wikitext: string): Promise<string> {
   const params = new URLSearchParams({
-    action: "parse",
-    format: "json",
-    contentmodel: "wikitext",
-    prop: "text",
-    disableeditsection: "1",
-    disablelimitreport: "1",
+    action: 'parse',
+    format: 'json',
+    contentmodel: 'wikitext',
+    prop: 'text',
+    disableeditsection: '1',
+    disablelimitreport: '1',
     text: wikitext,
   });
 
   const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
 
   if (!res.ok) throw new Error(`MediaWiki parse failed (${res.status})`);
 
   const json = (await res.json()) as MediaWikiParseResponse;
-  if ("error" in json) {
-    throw new Error(`MediaWiki parse error: ${json.error.info ?? json.error.code ?? "unknown"}`);
+  if ('error' in json) {
+    throw new Error(`MediaWiki parse error: ${json.error.info ?? json.error.code ?? 'unknown'}`);
   }
 
-  return json.parse.text["*"];
+  return json.parse.text['*'];
 }
 
 function extractInternalNameFromWikitext(wikitext: string): string | null {
   const match = wikitext.match(/\|internal-name\s*=\s*([^\n|]+)/i);
+
   return match?.[1]?.trim() ?? null;
 }
 
@@ -181,14 +191,14 @@ async function fetchInternalNamesBatch(titles: string[]): Promise<Map<string, st
 
   let batchStartIndex = 0;
   for (const batch of chunkArray(titles, BATCH_SIZE)) {
-    const infoboxTitles = batch.map(t => `Infobox:${t.replace(/\s/g, "_")}`).join("|");
+    const infoboxTitles = batch.map(t => `Infobox:${t.replace(/\s/g, '_')}`).join('|');
 
     const params = new URLSearchParams({
-      action: "query",
-      prop: "revisions",
-      rvslots: "main",
-      rvprop: "content",
-      format: "json",
+      action: 'query',
+      prop: 'revisions',
+      rvslots: 'main',
+      rvprop: 'content',
+      format: 'json',
       titles: infoboxTitles,
     });
 
@@ -206,11 +216,11 @@ async function fetchInternalNamesBatch(titles: string[]): Promise<Map<string, st
     const fetchedMap = new Map<string, string | null>();
     for (const page of Object.values(pages)) {
       const pageTitle = page.title;
-      if (!pageTitle) continue;
+      if (pageTitle === undefined) continue;
 
-      const itemTitle = pageTitle.replace(/^Infobox:/i, "");
-      const content = page.revisions?.[0]?.slots?.main?.["*"];
-      if (content) {
+      const itemTitle = pageTitle.replace(/^Infobox:/i, '');
+      const content = page.revisions?.[0]?.slots?.main?.['*'];
+      if (content !== undefined) {
         fetchedMap.set(itemTitle, extractInternalNameFromWikitext(content));
       } else {
         fetchedMap.set(itemTitle, null);
@@ -230,24 +240,24 @@ async function fetchInternalNamesBatch(titles: string[]): Promise<Map<string, st
 const COLUMNS_PER_ROW = 10;
 
 async function extractInventoryDataFromHtml(html: string): Promise<InventoryData> {
-  const tabMeta = new Map<number, { name: string; iconSrc: string; iconSrcset: string[] }>();
+  const tabMeta = new Map<number, { name: string; iconSrc: string; iconSrcset: string[]; }>();
   const rowsByTab = new Map<number, InventoryRow[]>();
 
   const tabStack: number[] = [];
   const tabHeadStack: number[] = [];
-  const rowStack: Array<{ tabIndex: number; items: InventoryItem[] }> = [];
-  const iconStack: Array<{
+  const rowStack: { tabIndex: number; items: InventoryItem[]; }[] = [];
+  const iconStack: {
     tabIndex: number;
     href: string | null;
     title: string | null;
     imgSrc: string | null;
     imgSrcset: string[];
-  }> = [];
+  }[] = [];
 
   const rewriter = new HTMLRewriter()
-    .on("div.inventory div.tab-header div.tab-head", {
+    .on('div.inventory div.tab-header div.tab-head', {
       element(el) {
-        const idx = parseIndexFromClassName(el.getAttribute("class"), TAB_HEAD_INDEX_RE);
+        const idx = parseIndexFromClassName(el.getAttribute('class'), TAB_HEAD_INDEX_RE);
         if (idx === null) return;
 
         tabHeadStack.push(idx);
@@ -255,35 +265,35 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
           tabHeadStack.pop();
         });
 
-        const name = el.getAttribute("data-name") ?? "";
+        const name = el.getAttribute('data-name') ?? '';
         const existing = tabMeta.get(idx);
         tabMeta.set(idx, {
           name,
-          iconSrc: existing?.iconSrc ?? "",
+          iconSrc: existing?.iconSrc ?? '',
           iconSrcset: existing?.iconSrcset ?? [],
         });
       },
     })
-    .on("div.inventory div.tab-header div.tab-head img", {
+    .on('div.inventory div.tab-header div.tab-head img', {
       element(el) {
         const idx = tabHeadStack.at(-1);
         if (idx === undefined) return;
 
-        const src = el.getAttribute("src");
-        if (!src) return;
+        const src = el.getAttribute('src');
+        if (src === null) return;
 
-        const srcsetRaw = el.getAttribute("srcset");
+        const srcsetRaw = el.getAttribute('srcset');
         const existing = tabMeta.get(idx);
         tabMeta.set(idx, {
-          name: existing?.name ?? "",
+          name: existing?.name ?? '',
           iconSrc: absolutizeWikiUrl(src),
-          iconSrcset: srcsetRaw ? rewriteSrcset(srcsetRaw) : [],
+          iconSrcset: srcsetRaw !== null ? rewriteSrcset(srcsetRaw) : [],
         });
       },
     })
-    .on("div.inventory div.tab", {
+    .on('div.inventory div.tab', {
       element(el) {
-        const idx = parseIndexFromClassName(el.getAttribute("class"), TAB_INDEX_RE);
+        const idx = parseIndexFromClassName(el.getAttribute('class'), TAB_INDEX_RE);
         if (idx === null) return;
         tabStack.push(idx);
         el.onEndTag(() => {
@@ -291,11 +301,11 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         });
       },
     })
-    .on("div.inventory div.tab > div", {
+    .on('div.inventory div.tab > div', {
       element(el) {
         const tabIndex = tabStack.at(-1);
         if (tabIndex === undefined) return;
-        if (el.getAttribute("class")?.includes("factorio-icon")) return;
+        if (el.getAttribute('class')?.includes('factorio-icon') === true) return;
 
         rowStack.push({ tabIndex, items: [] });
         el.onEndTag(() => {
@@ -307,7 +317,7 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         });
       },
     })
-    .on("div.inventory div.tab div.factorio-icon", {
+    .on('div.inventory div.tab div.factorio-icon', {
       element(el) {
         const tabIndex = tabStack.at(-1);
         if (tabIndex === undefined) return;
@@ -317,8 +327,8 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
           const icon = iconStack.pop();
           if (!icon) return;
 
-          if (!icon.title || !icon.href || !icon.imgSrc) return;
-          if (icon.title.includes(":")) return;
+          if (icon.title === null || icon.href === null || icon.imgSrc === null) return;
+          if (icon.title.includes(':')) return;
 
           const currentRow = rowStack.at(-1);
           if (currentRow && currentRow.tabIndex === icon.tabIndex) {
@@ -333,28 +343,28 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         });
       },
     })
-    .on("div.inventory div.tab div.factorio-icon a", {
+    .on('div.inventory div.tab div.factorio-icon a', {
       element(el) {
         const icon = iconStack.at(-1);
-        if (!icon) return;
+        if (icon === undefined) return;
 
-        const href = el.getAttribute("href");
-        if (href) icon.href = absolutizeWikiUrl(href);
+        const href = el.getAttribute('href');
+        if (href !== null) icon.href = absolutizeWikiUrl(href);
 
-        const title = el.getAttribute("title");
-        if (title) icon.title = title;
+        const title = el.getAttribute('title');
+        if (title !== null) icon.title = title;
       },
     })
-    .on("div.inventory div.tab div.factorio-icon img", {
+    .on('div.inventory div.tab div.factorio-icon img', {
       element(el) {
         const icon = iconStack.at(-1);
-        if (!icon) return;
+        if (icon === undefined) return;
 
-        const src = el.getAttribute("src");
-        if (src) icon.imgSrc = absolutizeWikiUrl(src);
+        const src = el.getAttribute('src');
+        if (src !== null) icon.imgSrc = absolutizeWikiUrl(src);
 
-        const srcsetRaw = el.getAttribute("srcset");
-        if (srcsetRaw) icon.imgSrcset = rewriteSrcset(srcsetRaw);
+        const srcsetRaw = el.getAttribute('srcset');
+        if (srcsetRaw !== null) icon.imgSrcset = rewriteSrcset(srcsetRaw);
       },
     });
 
@@ -370,7 +380,7 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
 
     tabs.push({
       name: meta?.name ?? `Tab ${i}`,
-      iconSrc: meta?.iconSrc ?? "",
+      iconSrc: meta?.iconSrc ?? '',
       iconSrcset: meta?.iconSrcset ?? [],
       rows,
     });
@@ -380,9 +390,9 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
 }
 
 async function main(): Promise<void> {
-  const outFile = path.join(process.cwd(), "src", "lib", "generated", "inventory-data.ts");
+  const outFile = path.join(process.cwd(), 'src', 'lib', 'generated', 'inventory-data.ts');
 
-  console.log("Fetching Template:Inventory...");
+  console.log('Fetching Template:Inventory...');
   const inventoryWikitext = await fetchText(INVENTORY_RAW_URL);
   const inventoryHtml = await parseWikitextToHtml(inventoryWikitext);
 
@@ -397,32 +407,32 @@ async function main(): Promise<void> {
   await mkdir(outDir, { recursive: true });
 
   const output = [
-    "export interface InventoryItem {",
-    "  title: string;",
-    "  internalName: string | null;",
-    "  href: string;",
-    "  imgSrc: string;",
-    "  imgSrcset: string[];",
-    "}",
-    "",
-    "export interface InventoryRow {",
-    "  items: (InventoryItem | null)[];",
-    "}",
-    "",
-    "export interface InventoryTab {",
-    "  name: string;",
-    "  iconSrc: string;",
-    "  iconSrcset: string[];",
-    "  rows: InventoryRow[];",
-    "}",
-    "",
-    "export interface InventoryData {",
-    "  tabs: InventoryTab[];",
-    "}",
-    "",
+    'export interface InventoryItem {',
+    '  title: string;',
+    '  internalName: string | null;',
+    '  href: string;',
+    '  imgSrc: string;',
+    '  imgSrcset: string[];',
+    '}',
+    '',
+    'export interface InventoryRow {',
+    '  items: (InventoryItem | null)[];',
+    '}',
+    '',
+    'export interface InventoryTab {',
+    '  name: string;',
+    '  iconSrc: string;',
+    '  iconSrcset: string[];',
+    '  rows: InventoryRow[];',
+    '}',
+    '',
+    'export interface InventoryData {',
+    '  tabs: InventoryTab[];',
+    '}',
+    '',
     `export const inventoryData: InventoryData = ${JSON.stringify(inventoryData, null, 2)};`,
-    "",
-  ].join("\n");
+    '',
+  ].join('\n');
 
   await Bun.write(outFile, output);
 
