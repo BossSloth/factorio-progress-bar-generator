@@ -1,17 +1,34 @@
+import classNames from "classnames";
 import { useEffect, useMemo, useState, type JSX } from "react";
-import { Quality } from "../lib/blueprints/quality";
-import { inventoryData, type InventoryItem, type InventoryTab } from "../lib/generated/inventory-data";
-import './signal-selector.css';
+import type { Quality } from "../lib/blueprints/quality";
+import { inventoryData, type InventoryItem, type InventoryRow, type InventoryTab } from "../lib/generated/inventory-data";
+import "./signal-selector.css";
 
 const COLUMNS_PER_ROW = 10;
 
-const QUALITIES: { id: Quality; color: string; label: string, icon: string }[] = [
+type QualityOption = { id: Quality; color: string; label: string; icon: string };
+
+const QUALITIES: readonly QualityOption[] = [
   { id: "normal", color: "#9d9d9d", label: "Normal", icon: "https://wiki.factorio.com/images/Quality_normal.png" },
   { id: "uncommon", color: "#51d254", label: "Uncommon", icon: "https://wiki.factorio.com/images/Quality_uncommon.png" },
   { id: "rare", color: "#52b1f6", label: "Rare", icon: "https://wiki.factorio.com/images/Quality_rare.png" },
   { id: "epic", color: "#a249e6", label: "Epic", icon: "https://wiki.factorio.com/images/Quality_epic.png" },
   { id: "legendary", color: "#f29f24", label: "Legendary", icon: "https://wiki.factorio.com/images/Quality_legendary.png" },
 ];
+
+function padToColumns(items: readonly InventoryItem[], columns: number): (InventoryItem | null)[] {
+  const padded: (InventoryItem | null)[] = [...items];
+  while (padded.length % columns !== 0) padded.push(null);
+  return padded;
+}
+
+function getTabIconSrc(tab: InventoryTab): string | null {
+  return tab.iconSrcset[1] ?? tab.iconSrcset[0] ?? tab.iconSrc ?? null;
+}
+
+function getItemIconSrc(item: InventoryItem): string {
+  return item.imgSrcset[0] ?? item.imgSrc;
+}
 
 function itemMatchesQuery(item: InventoryItem | null, q: string): item is InventoryItem {
   return item !== null &&
@@ -50,24 +67,23 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
     }
   }, [trimmedSearchQuery, tabsWithResults, activeTabIndex]);
 
-  const filteredRows = useMemo(() => {
+  const filteredRows = useMemo<InventoryRow[]>(() => {
     if (!activeTab) return [];
     if (!trimmedSearchQuery) return activeTab.rows;
 
-    const newRows = activeTab.rows
-      .map(row => ({
-        items: row.items.filter(item => itemMatchesQuery(item, trimmedSearchQuery)),
-      }))
-      .filter(row => row.items.length > 0);
-    return newRows.map((row) => {
-      const paddedItems: (InventoryItem | null)[] = [...row.items];
-      while (paddedItems.length % COLUMNS_PER_ROW != 0) paddedItems.push(null);
-      return { ...row, items: paddedItems };
-    });
+    return activeTab.rows
+      .map(row => row.items.filter((item): item is InventoryItem => itemMatchesQuery(item, trimmedSearchQuery)))
+      .filter(items => items.length > 0)
+      .map(items => ({ items: padToColumns(items, COLUMNS_PER_ROW) }));
   }, [activeTab, trimmedSearchQuery]);
 
+  const handleItemClick = (item: InventoryItem): void => {
+    if (!activeTab) return;
+    onItemClick?.(item, activeTab, selectedQuality);
+  };
+
   return (
-    <div className={`panel inventory ${className ?? ""}`}>
+    <div className={classNames("panel inventory", className)}>
       {/* Header */}
       <div className="flex flex-space-between flex-items-center mb8">
         <h2 className="m0" style={{ marginBottom: 0 }}>Select a signal</h2>
@@ -97,21 +113,25 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
       </div>
 
       {/* Tab buttons */}
-      <div className="panel-inset flex" style={{ height: "auto", padding: 0, marginBottom: 8, borderImageOutset: 0, backgroundClip: 'content-box' }}>
+      <div className="panel-inset flex" style={{ height: "auto", padding: 0, marginBottom: 8, borderImageOutset: 0, backgroundClip: "content-box" }}>
         {inventoryData.tabs.map((tab, idx) => {
           const hasResults = tabsWithResults[idx];
           const isActive = idx === activeTabIndex;
+          const tabIconSrc = getTabIconSrc(tab);
+          const tabClass = classNames("button square-l ml0", { "active": isActive, "disabled": !hasResults });
           return (
             <div
               key={tab.name}
-              className={`button square-l ml0 ${isActive ? 'active' : ''} ${!hasResults ? 'disabled' : ''}`}
+              className={tabClass}
               title={tab.name}
-              onClick={() => hasResults && setActiveTabIndex(idx)}
+              onClick={() => {
+                if (hasResults) setActiveTabIndex(idx);
+              }}
             >
-              {tab.iconSrc ? (
+              {tabIconSrc ? (
                 <img
                   alt={tab.name}
-                  src={tab.iconSrcset[1]}
+                  src={tabIconSrc}
                   decoding="async"
                 />
               ) : (
@@ -120,8 +140,8 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
             </div>
           );
         })}
-        <div className="slot" style={{ flex: 'unset', width: 76, height: 76}}>
-          <div className="slot-empty"></div>
+        <div className="slot" style={{ flex: "unset", width: 76, height: 76 }}>
+          <div className="slot-empty" />
         </div>
       </div>
 
@@ -142,21 +162,17 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
             justifyContent: "flex-start",
           }}
         >
-          {filteredRows.map((row, rowIdx) => (
-            row.items.map((item, colIdx) => (
+          {filteredRows.flatMap((row, rowIdx) =>
+            row.items.map((item, colIdx) =>
               item ? (
                 <div
                   key={item.internalName ?? item.title}
                   className="slot"
                   title={item.title}
-                  onClick={() => onItemClick?.(item, activeTab!, selectedQuality)}
+                  onClick={() => handleItemClick(item)}
                 >
                   <div className="slot-button">
-                    <img
-                      alt={item.title}
-                      src={item.imgSrcset[0]}
-                      decoding="async"
-                    />
+                    <img alt={item.title} src={getItemIconSrc(item)} decoding="async" />
                   </div>
                 </div>
               ) : (
@@ -164,8 +180,8 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
                   <div className="slot-empty" />
                 </div>
               )
-            ))
-          ))}
+            )
+          )}
           {filteredRows.length === 0 && (
             <div style={{ padding: 16, color: "#888", textAlign: "center", width: "100%" }}>
               No items found
@@ -182,16 +198,17 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
         {QUALITIES.map(q => {
           const isSelected = selectedQuality === q.id;
           return (
-          <div
-            key={q.id}
-            className={`button square-sm ml0 ${isSelected ? "active" : ""}`}
-            title={q.label}
-            onClick={() => setSelectedQuality(q.id)}
-            style={{ width: 32, height: 32, flexBasis: 32, padding: 5 }}
-          >
-            <img alt={q.label} src={q.icon} decoding="async" />
-          </div>
-        )})}
+            <div
+              key={q.id}
+              className={classNames("button square-sm ml0", { "active": isSelected })}
+              title={q.label}
+              onClick={() => setSelectedQuality(q.id)}
+              style={{ width: 32, height: 32, flexBasis: 32, padding: 5 }}
+            >
+              <img alt={q.label} src={q.icon} decoding="async" />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

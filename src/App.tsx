@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import './index.css';
 import { SignalSelector } from './inventory/SignalSelector';
 import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon } from './lib/blueprints';
@@ -19,6 +19,11 @@ const BAR_PRESETS: BarPreset[] = [
   { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '░' },
 ];
 
+const DEFAULT_ITEM_NAME = 'automation-science-pack';
+const DEFAULT_BAR_COLOR = '#ff0000';
+const DEFAULT_EMPTY_CHAR = '░';
+const DEFAULT_FILL_SCALE = ['█'];
+
 const clampInt = (n: number, min: number, max: number): number => {
 	if (!Number.isFinite(n)) return min;
 	return Math.min(max, Math.max(min, Math.floor(n)));
@@ -26,17 +31,17 @@ const clampInt = (n: number, min: number, max: number): number => {
 
 const normalizeHex = (value: string): string => {
 	const v = value.trim();
-	if (v.length === 0) return '#ff0000';
+	if (v.length === 0) return DEFAULT_BAR_COLOR;
 	if (v.startsWith('#')) return v;
 	return `#${v}`;
 };
 
-const qualityToTag = (quality: Quality): string => {
+const qualityToTag = (quality: Quality | undefined): string => {
 	if (!quality) return '';
 	return `,quality=${quality}`;
 };
 
-const makeItemTag = (itemName: string, quality: Quality): string => {
+const makeItemTag = (itemName: string, quality: Quality | undefined): string => {
 	return `[item=${itemName}${qualityToTag(quality)}]`;
 };
 
@@ -46,6 +51,12 @@ const repeatChar = (char: string, count: number): string => {
 };
 
 const splitChars = (value: string): string[] => Array.from(value);
+
+const toNonWhitespaceChars = (value: string): string[] => splitChars(value.trim()).filter(ch => ch.trim().length > 0);
+
+const firstNonWhitespaceChar = (value: string, fallback: string): string => {
+	return toNonWhitespaceChars(value)[0] ?? fallback;
+};
 
 const makeBar = (
 	percent: number,
@@ -85,6 +96,16 @@ const makeDisplayPanelText = (args: {
 	return `[font=${args.font}][color=${args.colorHex}]${args.itemTag}${args.bar}${args.trailingSpacer}[/color][/font]${args.percent}%`;
 };
 
+type ValueChangeHandler = (value: string) => void;
+
+const handleInputChange = (handler: ValueChangeHandler) => {
+	return (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handler(e.currentTarget.value);
+};
+
+const handleSelectChange = (handler: ValueChangeHandler) => {
+	return (e: ChangeEvent<HTMLSelectElement>) => handler(e.currentTarget.value);
+};
+
 const Checkbox = (props: {
 	checked: boolean;
 	onChange: (checked: boolean) => void;
@@ -100,15 +121,15 @@ const Checkbox = (props: {
 };
 
 export function App() {
-	const [conditionItemName, setConditionItemName] = useState('automation-science-pack');
-	const [textItemName, setTextItemName] = useState('automation-science-pack');
+	const [conditionItemName, setConditionItemName] = useState(DEFAULT_ITEM_NAME);
+	const [textItemName, setTextItemName] = useState(DEFAULT_ITEM_NAME);
 	const [syncItems, setSyncItems] = useState(true);
-	const [quality, setQuality] = useState<Quality>('normal');
-	const [barColorHex, setBarColorHex] = useState('#ff0000');
+	const [quality, setQuality] = useState<Quality | undefined>('normal');
+	const [barColorHex, setBarColorHex] = useState(DEFAULT_BAR_COLOR);
 	const [barPresetId, setBarPresetId] = useState<string>('blocks');
 	const [fillChar, setFillChar] = useState('█');
-	const [emptyChar, setEmptyChar] = useState('░');
-	const [barLength, setBarLength] = useState(28);
+	const [emptyChar, setEmptyChar] = useState(DEFAULT_EMPTY_CHAR);
+	const [barLength, setBarLength] = useState(26);
 	const [maxPercent, setMaxPercent] = useState(100);
 	const [font, setFont] = useState('technology-slot-level-font');
 	const [trailingSpacer, setTrailingSpacer] = useState('⠀');
@@ -129,21 +150,41 @@ export function App() {
 
 	const recommendedBarLength = useMemo(() => {
 		const safeMaxPercent = clampInt(maxPercent+2, 1, 1000);
-		const fillScaleLength = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0).length || 1;
+		const fillScaleLength = toNonWhitespaceChars(fillChar).length || 1;
 		return Math.ceil(safeMaxPercent / fillScaleLength);
 	}, [fillChar, maxPercent]);
 
-	const blueprintString = useMemo(() => {
-		const comparator: Comparator = '≤';
+	const safeInputs = useMemo(() => {
 		const safeMaxPercent = clampInt(maxPercent, 1, 1000);
 		const safeBarLength = clampInt(barLength, 1, 120);
-
 		const safeBarColor = normalizeHex(barColorHex);
-		const safeFillScale = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0);
-		const safeEmptyChar = (splitChars(emptyChar.trim()).find(ch => ch.trim().length > 0) ?? '░');
-		const safeConditionItem = conditionItemName.trim() || 'automation-science-pack';
+		const safeFillScale = toNonWhitespaceChars(fillChar);
+		const safeConditionItem = conditionItemName.trim() || DEFAULT_ITEM_NAME;
 		const safeTextItem = (syncItems ? safeConditionItem : textItemName.trim()) || safeConditionItem;
-		const itemTag = makeItemTag(safeTextItem, quality);
+		return {
+			safeMaxPercent,
+			safeBarLength,
+			safeBarColor,
+			safeFillScale: safeFillScale.length > 0 ? safeFillScale : DEFAULT_FILL_SCALE,
+			safeEmptyChar: firstNonWhitespaceChar(emptyChar, DEFAULT_EMPTY_CHAR),
+			safeConditionItem,
+			safeTextItem,
+			itemTag: makeItemTag(safeTextItem, quality),
+		};
+	}, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, maxPercent, quality, syncItems, textItemName]);
+
+	const blueprintString = useMemo(() => {
+		const comparator: Comparator = '≤';
+		const {
+			safeMaxPercent,
+			safeBarLength,
+			safeBarColor,
+			safeFillScale,
+			safeEmptyChar,
+			safeConditionItem,
+			safeTextItem,
+			itemTag,
+		} = safeInputs;
 
 		const blueprint = createEmptyBlueprint();
 		blueprint.blueprint.label = `Progress bar: ${safeTextItem}`;
@@ -183,18 +224,11 @@ export function App() {
 		});
 
 		return encodePlan(blueprint);
-	}, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, font, maxPercent, previewPercent, quality, syncItems, textItemName, trailingSpacer]);
+	}, [font, quality, safeInputs, trailingSpacer]);
 
 	const previewText = useMemo(() => {
-		const safeMaxPercent = clampInt(maxPercent, 1, 1000);
-		const safeBarLength = clampInt(barLength, 1, 120);
+		const { safeMaxPercent, safeBarLength, safeBarColor, safeFillScale, safeEmptyChar, itemTag } = safeInputs;
 		const safePercent = clampInt(previewPercent, 0, safeMaxPercent);
-		const safeBarColor = normalizeHex(barColorHex);
-		const safeFillScale = splitChars(fillChar.trim()).filter(ch => ch.trim().length > 0);
-		const safeEmptyChar = (splitChars(emptyChar.trim()).find(ch => ch.trim().length > 0) ?? '░');
-		const safeConditionItem = conditionItemName.trim() || 'automation-science-pack';
-		const safeTextItem = (syncItems ? safeConditionItem : textItemName.trim()) || safeConditionItem;
-		const itemTag = makeItemTag(safeTextItem, quality);
 		const bar = makeBar(safePercent, safeMaxPercent, safeBarLength, safeFillScale, safeEmptyChar);
 		return makeDisplayPanelText({
 			bar,
@@ -204,7 +238,11 @@ export function App() {
 			percent: safePercent,
 			trailingSpacer,
 		});
-	}, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, font, maxPercent, previewPercent, quality, syncItems, textItemName, trailingSpacer]);
+	}, [font, previewPercent, safeInputs, trailingSpacer]);
+
+	const setQualityFromValue = (value: string): void => {
+		setQuality(value ? (value as Quality) : undefined);
+	};
 
 	const copy = async () => {
 		await navigator.clipboard.writeText(blueprintString);
@@ -251,7 +289,7 @@ export function App() {
 									<select
 										className="button"
 										value={quality ?? ''}
-										onChange={e => setQuality((e.currentTarget.value || undefined) as Quality)}
+										onChange={handleSelectChange((value) => setQuality(value as Quality))}
 									>
 										<option value="">none</option>
 										<option value="normal">normal</option>
@@ -267,7 +305,7 @@ export function App() {
 									<input
 										type="text"
 										value={barColorHex}
-										onChange={e => setBarColorHex(e.currentTarget.value)}
+										onChange={handleInputChange(setBarColorHex)}
 										placeholder="#ff0000"
 									/>
 								</dd>
@@ -277,7 +315,7 @@ export function App() {
 									<input
 										type="text"
 										value={String(barLength)}
-										onChange={e => setBarLength(Number(e.currentTarget.value))}
+										onChange={handleInputChange((value) => setBarLength(Number(value)))}
 										placeholder="28"
 									/>
 									<div className="smaller mt8">Recommended: {recommendedBarLength}</div>
@@ -288,7 +326,7 @@ export function App() {
 									<input
 										type="text"
 										value={String(maxPercent)}
-										onChange={e => setMaxPercent(Number(e.currentTarget.value))}
+										onChange={handleInputChange((value) => setMaxPercent(Number(value)))}
 										placeholder="100"
 									/>
 								</dd>
@@ -298,7 +336,7 @@ export function App() {
 									<select
 										className="button"
 										value={barPresetId}
-										onChange={e => setBarPresetId(e.currentTarget.value)}
+										onChange={handleSelectChange(setBarPresetId)}
 									>
 										{BAR_PRESETS.map(p => (
 											<option key={p.id} value={p.id}>
@@ -310,12 +348,12 @@ export function App() {
 
 								<dt>Fill char</dt>
 								<dd>
-									<input type="text" value={fillChar} onChange={e => setFillChar(e.currentTarget.value)} />
+									<input type="text" value={fillChar} onChange={handleInputChange(setFillChar)} />
 								</dd>
 
 								<dt>Empty char</dt>
 								<dd>
-									<input type="text" value={emptyChar} onChange={e => setEmptyChar(e.currentTarget.value)} />
+									<input type="text" value={emptyChar} onChange={handleInputChange(setEmptyChar)} />
 								</dd>
 							</dl>
 							<Checkbox checked={syncItems} onChange={setSyncItems} label="Keep condition item and text item in sync" />
@@ -329,7 +367,7 @@ export function App() {
 									<input
 										type="range"
 										value={String(previewPercent)}
-										onChange={e => setPreviewPercent(Number(e.currentTarget.value))}
+										onChange={handleInputChange((value) => setPreviewPercent(Number(value)))}
 										placeholder="42"
                     min={0}
                     max={maxPercent}
@@ -337,7 +375,7 @@ export function App() {
                   <input
                     type="text"
                     value={String(previewPercent)}
-                    onChange={e => setPreviewPercent(Number(e.currentTarget.value))}
+									onChange={handleInputChange((value) => setPreviewPercent(Number(value)))}
                     placeholder="42"
                     min={0}
                     max={maxPercent}
