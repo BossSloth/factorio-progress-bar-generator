@@ -1,1 +1,1 @@
-export type Quality = "common" | "uncommon" | "rare" | "epic" | "legendary";
+export type Quality = "normal" | "uncommon" | "rare" | "epic" | "legendary";

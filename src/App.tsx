@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import './index.css';
-import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon, type Signal } from './lib/blueprints';
-
-type Quality = Signal['quality'];
+import { SignalSelector } from './inventory/SignalSelector';
+import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon } from './lib/blueprints';
+import { Quality } from './lib/blueprints/quality';
 
 type BarPreset = {
 	id: string;
@@ -103,7 +103,7 @@ export function App() {
 	const [conditionItemName, setConditionItemName] = useState('automation-science-pack');
 	const [textItemName, setTextItemName] = useState('automation-science-pack');
 	const [syncItems, setSyncItems] = useState(true);
-	const [quality, setQuality] = useState<Quality>('uncommon');
+	const [quality, setQuality] = useState<Quality>('normal');
 	const [barColorHex, setBarColorHex] = useState('#ff0000');
 	const [barPresetId, setBarPresetId] = useState<string>('blocks');
 	const [fillChar, setFillChar] = useState('█');
@@ -254,7 +254,7 @@ export function App() {
 										onChange={e => setQuality((e.currentTarget.value || undefined) as Quality)}
 									>
 										<option value="">none</option>
-										<option value="common">common</option>
+										<option value="normal">normal</option>
 										<option value="uncommon">uncommon</option>
 										<option value="rare">rare</option>
 										<option value="epic">epic</option>
@@ -366,6 +366,7 @@ export function App() {
 					</div>
 				</div>
 			</div>
+      <SignalSelector />
 		</div>
 	);
 }
