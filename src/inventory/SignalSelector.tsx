@@ -1,40 +1,35 @@
 import classNames from 'classnames';
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { ImCheckmark } from 'react-icons/im';
 import type { Quality } from '../lib/blueprints/quality';
-import { inventoryData, type InventoryItem, type InventoryRow, type InventoryTab } from '../lib/generated/inventory-data';
+import { inventoryData, Item, type InventoryItem, type InventoryRow, type InventoryTab } from '../lib/generated/inventory-data';
 import './signal-selector.css';
 
-const COLUMNS_PER_ROW = 10;
+const MAX_COLUMNS_PER_ROW = 10;
+const MIN_COLUMNS_PER_ROW = 4;
+const MIN_ROWS = 20;
 
-interface QualityOption { color: string; icon: string; id: Quality; label: string; }
+interface QualityOption { icon: string; id: Quality; label: string; }
 
 const QUALITIES: readonly QualityOption[] = [
-  { id: 'normal', color: '#9d9d9d', label: 'Normal', icon: 'https://wiki.factorio.com/images/Quality_normal.png' },
-  { id: 'uncommon', color: '#51d254', label: 'Uncommon', icon: 'https://wiki.factorio.com/images/Quality_uncommon.png' },
-  { id: 'rare', color: '#52b1f6', label: 'Rare', icon: 'https://wiki.factorio.com/images/Quality_rare.png' },
-  { id: 'epic', color: '#a249e6', label: 'Epic', icon: 'https://wiki.factorio.com/images/Quality_epic.png' },
-  { id: 'legendary', color: '#f29f24', label: 'Legendary', icon: 'https://wiki.factorio.com/images/Quality_legendary.png' },
+  { id: 'normal', label: 'Normal', icon: 'https://wiki.factorio.com/images/Quality_normal.png' },
+  { id: 'uncommon', label: 'Uncommon', icon: 'https://wiki.factorio.com/images/Quality_uncommon.png' },
+  { id: 'rare', label: 'Rare', icon: 'https://wiki.factorio.com/images/Quality_rare.png' },
+  { id: 'epic', label: 'Epic', icon: 'https://wiki.factorio.com/images/Quality_epic.png' },
+  { id: 'legendary', label: 'Legendary', icon: 'https://wiki.factorio.com/images/Quality_legendary.png' },
 ];
 
-function padToColumns(items: readonly InventoryItem[], columns: number): (InventoryItem | null)[] {
+function padToColumns(items: readonly (InventoryItem | null)[], columns: number): (InventoryItem | null)[] {
   const padded: (InventoryItem | null)[] = [...items];
   while (padded.length % columns !== 0) padded.push(null);
 
   return padded;
 }
 
-function getTabIconSrc(tab: InventoryTab): string {
-  return tab.iconSrcset[1] ?? tab.iconSrcset[0] ?? tab.iconSrc;
-}
-
-function getItemIconSrc(item: InventoryItem): string {
-  return item.imgSrcset[0] ?? item.imgSrc;
-}
-
 function itemMatchesQuery(item: InventoryItem | null, q: string): item is InventoryItem {
   return item !== null
     && (item.title.toLowerCase().includes(q)
-      || (item.internalName?.toLowerCase().includes(q) ?? false));
+      || item.internalName.toLowerCase().includes(q));
 }
 
 function tabHasResults(tab: InventoryTab, q: string): boolean {
@@ -43,15 +38,70 @@ function tabHasResults(tab: InventoryTab, q: string): boolean {
   return tab.rows.some(row => row.items.some(item => itemMatchesQuery(item, q)));
 }
 
-interface SignalSelectorProps {
-  onItemClick?(item: InventoryItem, tab: InventoryTab, quality: Quality): void;
-  readonly className?: string;
+function trimTrailingNulls(items: readonly (InventoryItem | null)[]): (InventoryItem | null)[] {
+  let lastIndex = items.length - 1;
+  while (lastIndex >= 0 && items[lastIndex] === null) lastIndex -= 1;
+
+  return items.slice(0, lastIndex + 1);
 }
 
-export function SignalSelector({ onItemClick, className }: SignalSelectorProps): JSX.Element {
+function chunkAndPad(items: readonly (InventoryItem | null)[], columns: number): InventoryRow[] {
+  const safeColumns = Math.max(1, columns);
+  const rows: InventoryRow[] = [];
+
+  if (items.length === 0) {
+    rows.push({ items: Array.from({ length: safeColumns }, () => null) });
+
+    return rows;
+  }
+
+  for (let i = 0; i < items.length; i += safeColumns) {
+    rows.push({ items: padToColumns(items.slice(i, i + safeColumns).filter((item): item is InventoryItem => item !== null), safeColumns) });
+  }
+
+  return rows;
+}
+
+function normalizeTabRowsForColumns(tabRows: readonly InventoryRow[], columns: number): InventoryRow[] {
+  return tabRows.flatMap((row) => {
+    const trimmed = trimTrailingNulls(row.items);
+    const safeColumns = Math.max(1, columns);
+
+    if (trimmed.length === 0) {
+      return [{ items: Array.from({ length: safeColumns }, () => null) }];
+    }
+
+    const chunks: (InventoryItem | null)[][] = [];
+    for (let i = 0; i < trimmed.length; i += safeColumns) {
+      chunks.push(trimmed.slice(i, i + safeColumns));
+    }
+
+    return chunks.map(chunk => ({ items: padToColumns(chunk, safeColumns) }));
+  });
+}
+
+interface SignalSelectorProps {
+  onClose?(): void;
+  onDragStart?(e: React.MouseEvent<HTMLDivElement>): void;
+  onItemClick?(item: InventoryItem, tab: InventoryTab, quality: Quality): void;
+  readonly className?: string;
+  readonly isDragging?: boolean;
+  readonly selectedItem?: Item;
+}
+
+export function getItem(internalName: string): InventoryItem | null {
+  return inventoryData.tabs.flatMap(tab => tab.rows.flatMap(row => row.items)).find(item => item?.internalName === internalName) ?? null;
+}
+
+export function SignalSelector({ onClose, onDragStart, onItemClick, className, isDragging, selectedItem }: SignalSelectorProps): JSX.Element {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedQuality, setSelectedQuality] = useState<Quality>('normal');
+  const [selectedQuality, setSelectedQuality] = useState<Quality>(selectedItem?.quality ?? 'normal');
+  const [columnsPerRow, setColumnsPerRow] = useState(MAX_COLUMNS_PER_ROW);
+  const inventoryRootRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const slotsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const activeTab = inventoryData.tabs[activeTabIndex];
   const trimmedSearchQuery = searchQuery.trim().toLowerCase();
@@ -69,25 +119,123 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
     }
   }, [trimmedSearchQuery, tabsWithResults, activeTabIndex]);
 
+  // Find the tab containing the selected item and open it
+  useEffect(() => {
+    if (!selectedItem) return;
+
+    const targetTabIndex = inventoryData.tabs.findIndex(tab =>
+      tab.rows.some(row => row.items.some(item => item?.internalName === selectedItem.internalName)));
+
+    if (targetTabIndex !== -1) {
+      setActiveTabIndex(targetTabIndex);
+      setSearchQuery('');
+    }
+  }, [selectedItem]);
+
+  // Scroll selected item into view
+  useEffect(() => {
+    const selectedElement = document.querySelector(`[data-item="${selectedItem?.internalName}"]`);
+    if (selectedElement && scrollContainerRef.current) {
+      selectedElement.scrollIntoView({ behavior: 'instant', block: 'center' });
+    }
+    if (searchRef.current) {
+      searchRef.current.focus();
+    }
+  }, [scrollContainerRef.current, selectedItem]);
+
+  useEffect(() => {
+    function updateColumns(): void {
+      const root = inventoryRootRef.current;
+      const slotsEl = slotsRef.current;
+      if (!root || !slotsEl) return;
+
+      const rootStyles = window.getComputedStyle(root);
+      const slotSize = Number.parseFloat(rootStyles.getPropertyValue('--inventory-slot-size')) || 42;
+      const slotMargin = Number.parseFloat(rootStyles.getPropertyValue('--inventory-slot-margin')) || 1;
+      const slotOuterWidth = slotSize + (slotMargin * 2);
+      const availableWidth = slotsEl.clientWidth;
+
+      const computed = Math.floor((availableWidth + 0.01) / slotOuterWidth);
+      const clamped = Math.max(MIN_COLUMNS_PER_ROW, Math.min(MAX_COLUMNS_PER_ROW, computed));
+      setColumnsPerRow(clamped);
+    }
+
+    updateColumns();
+
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(() => { updateColumns(); });
+
+    const slotsEl = slotsRef.current;
+    if (resizeObserver && slotsEl) {
+      resizeObserver.observe(slotsEl);
+    }
+    window.addEventListener('resize', updateColumns);
+
+    return (): void => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateColumns);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (document.activeElement !== searchRef.current) {
+          e.preventDefault();
+          searchRef.current?.focus();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return (): void => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const filteredRows = useMemo<InventoryRow[]>(() => {
     if (!activeTab) return [];
-    if (!trimmedSearchQuery) return activeTab.rows;
+    let newRows: InventoryRow[];
+    if (trimmedSearchQuery) {
+      newRows = activeTab.rows
+        .map(row => row.items.filter((item): item is InventoryItem => itemMatchesQuery(item, trimmedSearchQuery)))
+        .filter(items => items.length > 0)
+        .flatMap(items => chunkAndPad(items, columnsPerRow));
+    } else {
+      newRows = normalizeTabRowsForColumns(activeTab.rows, columnsPerRow);
+    }
 
-    return activeTab.rows
-      .map(row => row.items.filter((item): item is InventoryItem => itemMatchesQuery(item, trimmedSearchQuery)))
-      .filter(items => items.length > 0)
-      .map(items => ({ items: padToColumns(items, COLUMNS_PER_ROW) }));
-  }, [activeTab, trimmedSearchQuery]);
+    while (newRows.length < MIN_ROWS) {
+      newRows.push({ items: Array.from({ length: columnsPerRow }, () => null) });
+    }
+
+    return newRows;
+  }, [activeTab, trimmedSearchQuery, columnsPerRow]);
 
   function handleItemClick(item: InventoryItem): void {
     if (!activeTab) return;
     onItemClick?.(item, activeTab, selectedQuality);
   }
 
+  function handleTabClick(tabIndex: number): void {
+    setActiveTabIndex(tabIndex);
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+  }
+
   return (
-    <div className={classNames('panel inventory', className)}>
-      {/* Header */}
-      <div className="flex flex-space-between flex-items-center mb8">
+    <div
+      ref={inventoryRootRef}
+      className={classNames('panel inventory m0', className)}
+      style={{ width: 'min(500px, calc(100vw - 16px))' }}
+    >
+      {/* Header - draggable */}
+      <div
+        className="flex flex-space-between flex-items-center mb8"
+        onMouseDown={onDragStart}
+        style={{ cursor: isDragging === true ? 'grabbing' : 'grab', userSelect: 'none' }}
+      >
         <h2 className="m0" style={{ marginBottom: 0 }}>Select a signal</h2>
         <div className="flex flex-items-center" style={{ gap: 8 }}>
           <div style={{ position: 'relative' }}>
@@ -96,7 +244,9 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); }}
-              style={{ width: 140, paddingRight: 28 }}
+              onMouseDown={(e) => { e.stopPropagation(); }}
+              style={{ width: 'clamp(110px, 30vw, 140px)', paddingRight: 28, color: 'black' }}
+              ref={searchRef}
             />
             <span
               style={{
@@ -111,15 +261,24 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
               🔍
             </span>
           </div>
+          {onClose && (
+            <button
+              type="button"
+              className="button square-sm"
+              onClick={onClose}
+              onMouseDown={(e) => { e.stopPropagation(); }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
       {/* Tab buttons */}
-      <div className="panel-inset flex" style={{ height: 'auto', padding: 0, marginBottom: 8, borderImageOutset: 0, backgroundClip: 'content-box' }}>
+      <div className="panel-inset flex flex-wrap" style={{ height: 'auto', padding: 0, marginBottom: 8, borderImageOutset: 0, backgroundClip: 'content-box' /* width: 'calc(100% + 6px)', transform: 'translateX(-3px)' */ }}>
         {inventoryData.tabs.map((tab, idx) => {
           const hasResults = tabsWithResults[idx] ?? false;
           const isActive = idx === activeTabIndex;
-          const tabIconSrc = getTabIconSrc(tab);
           const tabClass = classNames('button square-l ml0', { active: isActive, disabled: !hasResults });
 
           return (
@@ -128,39 +287,35 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
               className={tabClass}
               title={tab.name}
               onClick={() => {
-                if (hasResults) setActiveTabIndex(idx);
+                if (hasResults) handleTabClick(idx);
               }}
             >
-              {tabIconSrc
-                ? (
-                    <img
-                      alt={tab.name}
-                      src={tabIconSrc}
-                      decoding="async"
-                    />
-                  )
-                : (
-                    <span style={{ fontSize: 12 }}>{tab.name.slice(0, 2)}</span>
-                  )}
+              <img
+                alt={tab.name}
+                src={tab.iconSrc}
+                decoding="async"
+              />
             </div>
           );
         })}
-        <div className="slot" style={{ flex: 'unset', width: 76, height: 76 }}>
+        <div className="slot" style={{ flex: 'unset', width: 'var(--inventory-tab-placeholder-size)', height: 'var(--inventory-tab-placeholder-size)' }}>
           <div className="slot-empty" />
         </div>
       </div>
 
       {/* Items grid */}
       <div
+        ref={scrollContainerRef}
         className="panel-inset"
         style={{
           padding: 4,
           minHeight: 200,
-          maxHeight: 400,
+          maxHeight: 'min(500px, 60vh)',
           overflowY: 'auto',
         }}
       >
         <div
+          ref={slotsRef}
           className="slots slots-wrap"
           style={{
             height: 'auto',
@@ -172,13 +327,14 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
               (item
                 ? (
                     <div
-                      key={item.internalName ?? item.title}
+                      key={item.internalName}
                       className="slot"
+                      data-item={item.internalName}
                       title={item.title}
                       onClick={() => { handleItemClick(item); }}
                     >
-                      <div className="slot-button">
-                        <img alt={item.title} src={getItemIconSrc(item)} decoding="async" />
+                      <div className={classNames('slot-button', { selected: selectedItem?.internalName === item.internalName })}>
+                        <img className="inventory-image" alt={item.title} src={item.imgSrc} decoding="async" />
                       </div>
                     </div>
                   )
@@ -198,24 +354,30 @@ export function SignalSelector({ onItemClick, className }: SignalSelectorProps):
 
       {/* Quality selector */}
       <div
-        className="panel-inset"
-        style={{ height: 'auto', padding: 4, marginTop: 8, justifyContent: 'flex-start' }}
+        className="panel-inset flex flex-space-between flex-items-center"
+        style={{ height: 'auto', padding: 4, marginTop: 8 }}
       >
-        {QUALITIES.map((q) => {
-          const isSelected = selectedQuality === q.id;
+        <div>
+          {QUALITIES.map((q) => {
+            const isSelected = selectedQuality === q.id;
 
-          return (
-            <div
-              key={q.id}
-              className={classNames('button square-sm ml0', { active: isSelected })}
-              title={q.label}
-              onClick={() => { setSelectedQuality(q.id); }}
-              style={{ width: 32, height: 32, flexBasis: 32, padding: 5 }}
-            >
-              <img alt={q.label} src={q.icon} decoding="async" />
-            </div>
-          );
-        })}
+            return (
+              <div
+                key={q.id}
+                className={classNames('button square-sm ml0', { active: isSelected })}
+                title={q.label}
+                onClick={() => { setSelectedQuality(q.id); }}
+                style={{ width: 'var(--inventory-quality-size)', height: 'var(--inventory-quality-size)', flexBasis: 'var(--inventory-quality-size)', padding: 'var(--inventory-quality-padding)' }}
+              >
+                <img alt={q.label} src={q.icon} decoding="async" />
+              </div>
+            );
+          })}
+        </div>
+        {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
+        <button className="button-green square-sm" onClick={() => { selectedItem !== undefined && handleItemClick(selectedItem); }} type="submit" style={{ color: '#EEEEEE' }}>
+          <ImCheckmark />
+        </button>
       </div>
     </div>
   );

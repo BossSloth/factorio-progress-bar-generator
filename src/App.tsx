@@ -1,8 +1,14 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import classNames from 'classnames';
 import { JSX, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { ColorInput } from './components/ColorInput';
+import { DraggablePopup } from './components/DraggablePopup';
+import { ItemRenderer } from './components/ItemRenderer';
 import './index.css';
-import { SignalSelector } from './inventory/SignalSelector';
+import { getItem, SignalSelector } from './inventory/SignalSelector';
 import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon } from './lib/blueprints';
 import { Quality } from './lib/blueprints/quality';
+import type { InventoryItem, Item } from './lib/generated/inventory-data';
 
 interface BarPreset {
   emptyChar: string;
@@ -13,10 +19,9 @@ interface BarPreset {
 
 const BAR_PRESETS: BarPreset[] = [
   { id: 'blocks', label: 'Blocks', fillChar: '▎▌▊█', emptyChar: '░' },
-  { id: 'dots', label: 'Dots', fillChar: '●', emptyChar: '○' },
   { id: 'hash', label: 'Hash', fillChar: '#', emptyChar: '-' },
   { id: 'lines', label: 'Lines', fillChar: '━', emptyChar: '─' },
-  { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '░' },
+  { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '○' },
 ];
 
 const DEFAULT_ITEM_NAME = 'automation-science-pack';
@@ -44,8 +49,8 @@ function qualityToTag(quality: Quality | undefined): string {
   return `,quality=${quality}`;
 }
 
-function makeItemTag(itemName: string, quality: Quality | undefined): string {
-  return `[item=${itemName}${qualityToTag(quality)}]`;
+function makeItemTag(item: Item): string {
+  return `[item=${item.internalName}${qualityToTag(item.quality)}]`;
 }
 
 function repeatChar(char: string, count: number): string {
@@ -144,12 +149,16 @@ function Checkbox({
   );
 }
 
+function inventoryItemToItem(inventoryItem: InventoryItem, quality: Quality = 'normal'): Item {
+  return { ...inventoryItem, quality };
+}
+
 // eslint-disable-next-line react/no-multi-comp
 export function App(): JSX.Element {
-  const [conditionItemName, setConditionItemName] = useState(DEFAULT_ITEM_NAME);
-  const [textItemName, setTextItemName] = useState(DEFAULT_ITEM_NAME);
+  const [conditionItem, setConditionItem] = useState<Item>(inventoryItemToItem(getItem(DEFAULT_ITEM_NAME)!));
+  const [textItem, setTextItem] = useState<Item>(inventoryItemToItem(getItem(DEFAULT_ITEM_NAME)!));
   const [syncItems, setSyncItems] = useState(true);
-  const [quality, setQuality] = useState<Quality | undefined>('normal');
+  const [selectorTarget, setSelectorTarget] = useState<'condition' | 'text' | null>(null);
   const [barColorHex, setBarColorHex] = useState(DEFAULT_BAR_COLOR);
   const [barPresetId, setBarPresetId] = useState<string>('blocks');
   const [fillChar, setFillChar] = useState('█');
@@ -165,8 +174,17 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     if (!syncItems) return;
-    setTextItemName(conditionItemName);
-  }, [conditionItemName, syncItems]);
+    setTextItem(conditionItem);
+  }, [conditionItem, syncItems]);
+
+  function handleSignalSelect(item: InventoryItem, _tab: unknown, quality: Quality): void {
+    if (selectorTarget === 'condition') {
+      setConditionItem(inventoryItemToItem(item, quality));
+    } else if (selectorTarget === 'text') {
+      setTextItem(inventoryItemToItem(item, quality));
+    }
+    setSelectorTarget(null);
+  }
 
   useEffect(() => {
     const preset = BAR_PRESETS.find(p => p.id === barPresetId);
@@ -187,8 +205,6 @@ export function App(): JSX.Element {
     const safeBarLength = clampInt(barLength, 1, 120);
     const safeBarColor = normalizeHex(barColorHex);
     const safeFillScale = toNonWhitespaceChars(fillChar);
-    const safeConditionItem = conditionItemName.trim() || DEFAULT_ITEM_NAME;
-    const safeTextItem = (syncItems ? safeConditionItem : textItemName.trim()) || safeConditionItem;
 
     return {
       safeMaxPercent,
@@ -196,11 +212,9 @@ export function App(): JSX.Element {
       safeBarColor,
       safeFillScale: safeFillScale.length > 0 ? safeFillScale : DEFAULT_FILL_SCALE,
       safeEmptyChar: firstNonWhitespaceChar(emptyChar, DEFAULT_EMPTY_CHAR),
-      safeConditionItem,
-      safeTextItem,
-      itemTag: makeItemTag(safeTextItem, quality),
+      itemTag: makeItemTag(textItem),
     };
-  }, [barColorHex, barLength, conditionItemName, emptyChar, fillChar, maxPercent, quality, syncItems, textItemName]);
+  }, [barColorHex, barLength, textItem, emptyChar, fillChar, maxPercent]);
 
   const blueprintString = useMemo(() => {
     const comparator: Comparator = '≤';
@@ -210,17 +224,15 @@ export function App(): JSX.Element {
       safeBarColor,
       safeFillScale,
       safeEmptyChar,
-      safeConditionItem,
-      safeTextItem,
       itemTag,
     } = safeInputs;
 
     const blueprint = createEmptyBlueprint();
-    blueprint.blueprint.label = `Progress bar: ${safeTextItem}`;
+    blueprint.blueprint.label = `Progress bar: ${textItem.internalName}`;
 
     const icons: Icon[] = [
       { index: 1, signal: { name: 'display-panel' } },
-      { index: 2, signal: { type: 'item', name: safeTextItem, quality } },
+      { index: 2, signal: { type: 'item', name: textItem.internalName, quality: textItem.quality } },
     ];
     blueprint.blueprint.icons = icons;
 
@@ -242,11 +254,11 @@ export function App(): JSX.Element {
               percent,
               trailingSpacer,
             }),
-            icon: { name: safeTextItem, quality },
+            icon: { name: textItem.internalName, quality: textItem.quality },
             condition: {
               comparator,
               constant: percent,
-              first_signal: { name: safeConditionItem, quality },
+              first_signal: { name: conditionItem.internalName, quality: conditionItem.quality },
             },
           };
         }),
@@ -254,7 +266,7 @@ export function App(): JSX.Element {
     });
 
     return encodePlan(blueprint);
-  }, [font, quality, safeInputs, trailingSpacer]);
+  }, [font, safeInputs, trailingSpacer]);
 
   const previewText = useMemo(() => {
     const { safeMaxPercent, safeBarLength, safeBarColor, safeFillScale, safeEmptyChar, itemTag } = safeInputs;
@@ -293,51 +305,34 @@ export function App(): JSX.Element {
             <div className="panel">
               <h3>Settings</h3>
               <dl className="panel-hole">
-                <dt>Condition item</dt>
+                <dt>Condition signal</dt>
                 <dd>
-                  <input
-                    type="text"
-                    value={conditionItemName}
-                    onChange={(e) => { setConditionItemName(e.currentTarget.value); }}
-                    placeholder="automation-science-pack"
-                  />
-                </dd>
-
-                <dt>Text item</dt>
-                <dd>
-                  <input
-                    type="text"
-                    value={textItemName}
-                    onChange={(e) => { setTextItemName(e.currentTarget.value); }}
-                    disabled={syncItems}
-                    placeholder="automation-science-pack"
-                  />
-                </dd>
-
-                <dt>Quality</dt>
-                <dd>
-                  <select
-                    className="button"
-                    value={quality ?? ''}
-                    onChange={handleSelectChange((value) => { setQuality(value as Quality); })}
+                  <button
+                    type="button"
+                    className={classNames('button square-m', { active: selectorTarget === 'condition' })}
+                    onClick={() => { setSelectorTarget('condition'); }}
+                    style={{ padding: 4 }}
                   >
-                    <option value="">none</option>
-                    <option value="normal">normal</option>
-                    <option value="uncommon">uncommon</option>
-                    <option value="rare">rare</option>
-                    <option value="epic">epic</option>
-                    <option value="legendary">legendary</option>
-                  </select>
+                    <ItemRenderer item={conditionItem} />
+                  </button>
+                </dd>
+
+                <dt>Text signal</dt>
+                <dd>
+                  <button
+                    type="button"
+                    className={classNames('button square-m', { disabled: syncItems, active: selectorTarget === 'text' })}
+                    disabled={syncItems}
+                    onClick={() => { setSelectorTarget('text'); }}
+                    style={{ padding: 4 }}
+                  >
+                    <ItemRenderer item={textItem} />
+                  </button>
                 </dd>
 
                 <dt>Bar color</dt>
                 <dd>
-                  <input
-                    type="text"
-                    value={barColorHex}
-                    onChange={handleInputChange(setBarColorHex)}
-                    placeholder="#ff0000"
-                  />
+                  <ColorInput value={barColorHex} onChange={setBarColorHex} />
                 </dd>
 
                 <dt>Bar length</dt>
@@ -434,7 +429,17 @@ export function App(): JSX.Element {
           </div>
         </div>
       </div>
-      <SignalSelector />
+      <DraggablePopup isOpen={selectorTarget !== null}>
+        {({ isDragging, onDragStart }) => (
+          <SignalSelector
+            isDragging={isDragging}
+            onClose={() => { setSelectorTarget(null); }}
+            onDragStart={onDragStart}
+            onItemClick={handleSignalSelect}
+            selectedItem={conditionItem}
+          />
+        )}
+      </DraggablePopup>
     </div>
   );
 }

@@ -8,11 +8,29 @@ const WIKI_BASE = 'https://wiki.factorio.com';
 const API_URL = `${WIKI_BASE}/api.php`;
 const INVENTORY_RAW_URL = `${WIKI_BASE}/Template:Inventory?action=raw`;
 
+const UNKNOWN_INTERNAL_NAMES: Record<string, string> = {
+  'Water barrel': 'water-barrel',
+  'Crude oil barrel': 'crude-oil-barrel',
+  'Petroleum gas barrel': 'petroleum-gas-barrel',
+  'Light oil barrel': 'light-oil-barrel',
+  'Heavy oil barrel': 'heavy-oil-barrel',
+  'Lubricant barrel': 'lubricant-barrel',
+  'Sulfuric acid barrel': 'sulfuric-acid-barrel',
+  'Fluoroketone (hot) barrel': 'fluoroketone-hot-barrel',
+  'Fluoroketone (cold) barrel': 'fluoroketone-cold-barrel',
+  Barrel: 'barrel',
+  Nauvis: 'nauvis',
+  Vulcanus: 'vulcanus',
+  Gleba: 'gleba',
+  Fulgora: 'fulgora',
+  Aquilo: 'aquilo',
+  'Solar system edge': 'solar-system-edge',
+  'Shattered planet': 'shattered-planet',
+};
+
 interface InventoryItem {
-  href: string;
   imgSrc: string;
-  imgSrcset: string[];
-  internalName: string | null;
+  internalName: string;
   title: string;
 }
 
@@ -22,7 +40,6 @@ interface InventoryRow {
 
 interface InventoryTab {
   iconSrc: string;
-  iconSrcset: string[];
   name: string;
   rows: InventoryRow[];
 }
@@ -130,7 +147,10 @@ function getUniqueItemTitles(data: InventoryData): string[] {
 
 function applyInternalNames(data: InventoryData, names: Map<string, string | null>): void {
   for (const item of iterInventoryItems(data)) {
-    item.internalName = names.get(item.title) ?? null;
+    const name = names.get(item.title)
+      ?? UNKNOWN_INTERNAL_NAMES[item.title];
+    if (name === undefined) throw new Error(`Unknown internal name for ${item.title}`);
+    item.internalName = name;
   }
 }
 
@@ -240,7 +260,7 @@ async function fetchInternalNamesBatch(titles: string[]): Promise<Map<string, st
 const COLUMNS_PER_ROW = 10;
 
 async function extractInventoryDataFromHtml(html: string): Promise<InventoryData> {
-  const tabMeta = new Map<number, { name: string; iconSrc: string; iconSrcset: string[]; }>();
+  const tabMeta = new Map<number, { name: string; iconSrc: string; }>();
   const rowsByTab = new Map<number, InventoryRow[]>();
 
   const tabStack: number[] = [];
@@ -248,10 +268,8 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
   const rowStack: { tabIndex: number; items: InventoryItem[]; }[] = [];
   const iconStack: {
     tabIndex: number;
-    href: string | null;
     title: string | null;
     imgSrc: string | null;
-    imgSrcset: string[];
   }[] = [];
 
   const rewriter = new HTMLRewriter()
@@ -270,7 +288,6 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         tabMeta.set(idx, {
           name,
           iconSrc: existing?.iconSrc ?? '',
-          iconSrcset: existing?.iconSrcset ?? [],
         });
       },
     })
@@ -286,8 +303,7 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         const existing = tabMeta.get(idx);
         tabMeta.set(idx, {
           name: existing?.name ?? '',
-          iconSrc: absolutizeWikiUrl(src),
-          iconSrcset: srcsetRaw !== null ? rewriteSrcset(srcsetRaw) : [],
+          iconSrc: srcsetRaw !== null ? rewriteSrcset(srcsetRaw)[1] ?? '' : '',
         });
       },
     })
@@ -322,22 +338,20 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         const tabIndex = tabStack.at(-1);
         if (tabIndex === undefined) return;
 
-        iconStack.push({ tabIndex, href: null, title: null, imgSrc: null, imgSrcset: [] });
+        iconStack.push({ tabIndex, title: null, imgSrc: null });
         el.onEndTag(() => {
           const icon = iconStack.pop();
           if (!icon) return;
 
-          if (icon.title === null || icon.href === null || icon.imgSrc === null) return;
+          if (icon.title === null || icon.imgSrc === null) return;
           if (icon.title.includes(':')) return;
 
           const currentRow = rowStack.at(-1);
           if (currentRow && currentRow.tabIndex === icon.tabIndex) {
             currentRow.items.push({
               title: icon.title,
-              internalName: null,
-              href: icon.href,
+              internalName: '',
               imgSrc: icon.imgSrc,
-              imgSrcset: icon.imgSrcset,
             });
           }
         });
@@ -348,9 +362,6 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         const icon = iconStack.at(-1);
         if (icon === undefined) return;
 
-        const href = el.getAttribute('href');
-        if (href !== null) icon.href = absolutizeWikiUrl(href);
-
         const title = el.getAttribute('title');
         if (title !== null) icon.title = title;
       },
@@ -360,11 +371,8 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
         const icon = iconStack.at(-1);
         if (icon === undefined) return;
 
-        const src = el.getAttribute('src');
-        if (src !== null) icon.imgSrc = absolutizeWikiUrl(src);
-
         const srcsetRaw = el.getAttribute('srcset');
-        if (srcsetRaw !== null) icon.imgSrcset = rewriteSrcset(srcsetRaw);
+        if (srcsetRaw !== null) icon.imgSrc = rewriteSrcset(srcsetRaw)[0] ?? '';
       },
     });
 
@@ -381,7 +389,6 @@ async function extractInventoryDataFromHtml(html: string): Promise<InventoryData
     tabs.push({
       name: meta?.name ?? `Tab ${i}`,
       iconSrc: meta?.iconSrc ?? '',
-      iconSrcset: meta?.iconSrcset ?? [],
       rows,
     });
   }
@@ -406,29 +413,35 @@ async function main(): Promise<void> {
   const outDir = path.dirname(outFile);
   await mkdir(outDir, { recursive: true });
 
+  const outputTypes = /* ts */`
+import { Quality } from "../blueprints/quality";
+
+export interface InventoryItem {
+  title: string;
+  internalName: string;
+  imgSrc: string;
+}
+
+export interface Item extends InventoryItem {
+  quality: Quality;
+}
+
+export interface InventoryRow {
+  items: (InventoryItem | null)[];
+}
+
+export interface InventoryTab {
+  name: string;
+  iconSrc: string;
+  rows: InventoryRow[];
+}
+
+export interface InventoryData {
+  tabs: InventoryTab[];
+}`;
+
   const output = [
-    'export interface InventoryItem {',
-    '  title: string;',
-    '  internalName: string | null;',
-    '  href: string;',
-    '  imgSrc: string;',
-    '  imgSrcset: string[];',
-    '}',
-    '',
-    'export interface InventoryRow {',
-    '  items: (InventoryItem | null)[];',
-    '}',
-    '',
-    'export interface InventoryTab {',
-    '  name: string;',
-    '  iconSrc: string;',
-    '  iconSrcset: string[];',
-    '  rows: InventoryRow[];',
-    '}',
-    '',
-    'export interface InventoryData {',
-    '  tabs: InventoryTab[];',
-    '}',
+    outputTypes.trim(),
     '',
     `export const inventoryData: InventoryData = ${JSON.stringify(inventoryData, null, 2)};`,
     '',

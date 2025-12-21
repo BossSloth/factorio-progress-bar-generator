@@ -1,2 +1,39 @@
 @import "tailwindcss";
 @import "./factorio.css";
+
+
+.quality::after {
+  content: "";
+  background-size: 16px 16px;
+  position: absolute;
+  display: inline-block;
+  bottom: 2;
+  right: 2;
+  width: 16px;
+  height: 16px;
+}
+.uncommon::after {
+  background-image: url('https://wiki.factorio.com/images/Quality_uncommon.png');
+}
+.rare::after {
+  background-image: url('https://wiki.factorio.com/images/Quality_rare.png');
+}
+.epic::after {
+  background-image: url('https://wiki.factorio.com/images/Quality_epic.png');
+}
+.legendary::after {
+  background-image: url('https://wiki.factorio.com/images/Quality_legendary.png');
+}
+
+@media screen and (max-width: 640px) {
+  .color-input {
+    /* flex-wrap: wrap; */
+  }
+}
+
+/* From 900px to 1280px */
+@media screen and (min-width: 900px) and (max-width: 1280px) {
+  .color-input {
+    /* flex-wrap: wrap; */
+  }
+}
