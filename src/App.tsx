@@ -4,6 +4,7 @@ import { JSX, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { ColorInput } from './components/ColorInput';
 import { DraggablePopup } from './components/DraggablePopup';
 import { ItemRenderer } from './components/ItemRenderer';
+import { PreviewPanel } from './components/PreviewPanel';
 import './index.css';
 import { getItem, SignalSelector } from './inventory/SignalSelector';
 import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon } from './lib/blueprints';
@@ -58,6 +59,8 @@ function repeatChar(char: string, count: number): string {
 
   return char.repeat(count);
 }
+
+const MAX_PERCENT = 100;
 
 function splitChars(value: string): string[] {
   return Array.from(value);
@@ -142,7 +145,7 @@ function Checkbox({
 }): JSX.Element {
   return (
     <label className="checkbox-label">
-      <input type="checkbox" checked={checked} onChange={(e) => { onChange(e.currentTarget.checked); }} />
+      <input type="checkbox" name={label} checked={checked} onChange={(e) => { onChange(e.currentTarget.checked); }} />
       <div className="checkbox" />
       <div>{label}</div>
     </label>
@@ -164,7 +167,6 @@ export function App(): JSX.Element {
   const [fillChar, setFillChar] = useState('█');
   const [emptyChar, setEmptyChar] = useState(DEFAULT_EMPTY_CHAR);
   const [barLength, setBarLength] = useState(26);
-  const [maxPercent, setMaxPercent] = useState(100);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [font, setFont] = useState('technology-slot-level-font');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -194,32 +196,29 @@ export function App(): JSX.Element {
   }, [barPresetId]);
 
   const recommendedBarLength = useMemo(() => {
-    const safeMaxPercent = clampInt(maxPercent + 2, 1, 1000);
+    const safeMaxPercent = MAX_PERCENT + 2;
     const fillScaleLength = toNonWhitespaceChars(fillChar).length || 1;
 
     return Math.ceil(safeMaxPercent / fillScaleLength);
-  }, [fillChar, maxPercent]);
+  }, [fillChar]);
 
   const safeInputs = useMemo(() => {
-    const safeMaxPercent = clampInt(maxPercent, 1, 1000);
     const safeBarLength = clampInt(barLength, 1, 120);
     const safeBarColor = normalizeHex(barColorHex);
     const safeFillScale = toNonWhitespaceChars(fillChar);
 
     return {
-      safeMaxPercent,
       safeBarLength,
       safeBarColor,
       safeFillScale: safeFillScale.length > 0 ? safeFillScale : DEFAULT_FILL_SCALE,
       safeEmptyChar: firstNonWhitespaceChar(emptyChar, DEFAULT_EMPTY_CHAR),
       itemTag: makeItemTag(textItem),
     };
-  }, [barColorHex, barLength, textItem, emptyChar, fillChar, maxPercent]);
+  }, [barColorHex, barLength, textItem, emptyChar, fillChar]);
 
   const blueprintString = useMemo(() => {
     const comparator: Comparator = '≤';
     const {
-      safeMaxPercent,
       safeBarLength,
       safeBarColor,
       safeFillScale,
@@ -236,14 +235,16 @@ export function App(): JSX.Element {
     ];
     blueprint.blueprint.icons = icons;
 
+    const strategicIndices = Array.from({ length: MAX_PERCENT + 1 }, (_, i) => i).filter(i => i !== 50);
+
     addEntity(blueprint, {
       name: 'display-panel',
       position: { x: 0, y: 0 },
       always_show: true,
       direction: 8,
       control_behavior: {
-        parameters: Array.from({ length: safeMaxPercent + 1 }, (_, percent) => {
-          const bar = makeBar(percent, safeMaxPercent, safeBarLength, safeFillScale, safeEmptyChar);
+        parameters: strategicIndices.map((percent) => {
+          const bar = makeBar(percent, MAX_PERCENT, safeBarLength, safeFillScale, safeEmptyChar);
 
           return {
             text: makeDisplayPanelText({
@@ -269,9 +270,13 @@ export function App(): JSX.Element {
   }, [font, safeInputs, trailingSpacer]);
 
   const previewText = useMemo(() => {
-    const { safeMaxPercent, safeBarLength, safeBarColor, safeFillScale, safeEmptyChar, itemTag } = safeInputs;
-    const safePercent = clampInt(previewPercent, 0, safeMaxPercent);
-    const bar = makeBar(safePercent, safeMaxPercent, safeBarLength, safeFillScale, safeEmptyChar);
+    const { safeBarLength, safeBarColor, safeFillScale, safeEmptyChar, itemTag } = safeInputs;
+    let safePercent = clampInt(previewPercent, 0, MAX_PERCENT);
+    const bar = makeBar(safePercent, MAX_PERCENT, safeBarLength, safeFillScale, safeEmptyChar);
+    if (safePercent === 50) {
+      setPreviewPercent(51);
+      safePercent = 51;
+    }
 
     return makeDisplayPanelText({
       bar,
@@ -339,6 +344,7 @@ export function App(): JSX.Element {
                 <dd>
                   <input
                     type="text"
+                    name="bar-length"
                     value={String(barLength)}
                     onChange={handleInputChange((value) => { setBarLength(Number(value)); })}
                     placeholder="28"
@@ -346,20 +352,11 @@ export function App(): JSX.Element {
                   <div className="smaller mt8">Recommended: {recommendedBarLength}</div>
                 </dd>
 
-                <dt>Max percent</dt>
-                <dd>
-                  <input
-                    type="text"
-                    value={String(maxPercent)}
-                    onChange={handleInputChange((value) => { setMaxPercent(Number(value)); })}
-                    placeholder="100"
-                  />
-                </dd>
-
                 <dt>Bar style</dt>
                 <dd>
                   <select
                     className="button"
+                    name="bar-style"
                     value={barPresetId}
                     onChange={handleSelectChange(setBarPresetId)}
                   >
@@ -373,46 +370,23 @@ export function App(): JSX.Element {
 
                 <dt>Fill char</dt>
                 <dd>
-                  <input type="text" value={fillChar} onChange={handleInputChange(setFillChar)} />
+                  <input type="text" name="fill-char" value={fillChar} onChange={handleInputChange(setFillChar)} />
                 </dd>
 
                 <dt>Empty char</dt>
                 <dd>
-                  <input type="text" value={emptyChar} onChange={handleInputChange(setEmptyChar)} />
+                  <input type="text" name="empty-char" value={emptyChar} onChange={handleInputChange(setEmptyChar)} />
                 </dd>
               </dl>
               <Checkbox checked={syncItems} onChange={setSyncItems} label="Keep condition item and text item in sync" />
             </div>
 
-            <div className="panel">
-              <h3>Preview</h3>
-              <dl className="panel-hole">
-                <dt>Preview percent</dt>
-                <dd>
-                  <input
-                    type="range"
-                    value={String(previewPercent)}
-                    onChange={handleInputChange((value) => { setPreviewPercent(Number(value)); })}
-                    placeholder="42"
-                    min={0}
-                    max={maxPercent}
-                  />
-                  <input
-                    type="text"
-                    value={String(previewPercent)}
-                    onChange={handleInputChange((value) => { setPreviewPercent(Number(value)); })}
-                    placeholder="42"
-                    min={0}
-                    max={maxPercent}
-                  />
-                </dd>
-              </dl>
-              <div className="panel-hole">
-                <div className="panel-hole-inner">
-                  <pre style={{ margin: 0 }}>{previewText}</pre>
-                </div>
-              </div>
-            </div>
+            <PreviewPanel
+              previewPercent={previewPercent}
+              previewText={previewText}
+              maxPercent={MAX_PERCENT}
+              onPreviewPercentChange={setPreviewPercent}
+            />
           </div>
 
           <div>
