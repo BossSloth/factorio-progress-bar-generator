@@ -257,28 +257,6 @@ pre {
   margin-right: 16px;
   font-size: 85%;
 }
-.footer-rocket {
-  text-align: center;
-  background: url('./static/img/footer-bg.jpg');
-  background-position: center center;
-  background-size: 192px;
-  width: 240px;
-  position: relative;
-  overflow: visible !important;
-}
-.footer-rocket .rocket {
-  background: url('./static/img/rocket-idle.png');
-  background-size: 78px;
-  width: 78px;
-  margin-left: -39px;
-  height: 120px;
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  z-index: 50;
-  transition: height 1s linear;
-  cursor: pointer;
-}
 .footer-rocket .rocket.rocket-animating {
   transition: height 0s;
   background: url('https://webcdn.factorio.com/assets/img/web/rocket-loop-halfsize.png') 0 0 no-repeat;

@@ -1,5 +1,5 @@
 .preview-panel {
-  background: url('../static/img/factorio-display-panel.png');
+  background: url('../../static/factorio-display-panel.png');
   background-size: 200%;
   background-position: center;
   height: 0;

@@ -1,6 +1,8 @@
 import classNames from 'classnames';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { BsQuestionCircle } from 'react-icons/bs';
 import { ImCheckmark } from 'react-icons/im';
+import unknownImg from 'static/question-mark.png';
 import type { Quality } from '../lib/blueprints/quality';
 import { inventoryData, Item, type InventoryItem, type InventoryRow, type InventoryTab } from '../lib/generated/inventory-data';
 import './signal-selector.css';
@@ -98,10 +100,13 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedQuality, setSelectedQuality] = useState<Quality>(selectedItem?.quality ?? 'normal');
   const [columnsPerRow, setColumnsPerRow] = useState(MAX_COLUMNS_PER_ROW);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualItemName, setManualItemName] = useState('');
   const inventoryRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const slotsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   const activeTab = inventoryData.tabs[activeTabIndex];
   const trimmedSearchQuery = searchQuery.trim().toLowerCase();
@@ -141,6 +146,19 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
     if (searchRef.current) {
       searchRef.current.focus();
     }
+
+    if (!selectedItem) return;
+
+    const existingItem = getItem(selectedItem.internalName);
+    if (!existingItem) {
+      setManualItemName(selectedItem.internalName);
+      setShowManualInput(true);
+      if (manualInputRef.current) {
+        manualInputRef.current.focus();
+      }
+    }
+
+    // If item can't be found in inventory we open the manual input
   }, [scrollContainerRef.current, selectedItem]);
 
   useEffect(() => {
@@ -217,6 +235,20 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
   function handleItemClick(item: InventoryItem): void {
     if (!activeTab) return;
     onItemClick?.(item, activeTab, selectedQuality);
+  }
+
+  function handleManualItem(): void {
+    const trimmedName = manualItemName.trim();
+    if (trimmedName && activeTab) {
+      const item = getItem(trimmedName) ?? {
+        internalName: trimmedName,
+        title: trimmedName,
+        imgSrc: unknownImg,
+      };
+      handleItemClick(item);
+      setManualItemName('');
+      setShowManualInput(false);
+    }
   }
 
   function handleTabClick(tabIndex: number): void {
@@ -374,11 +406,52 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
             );
           })}
         </div>
-        {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
-        <button className="button-green square-sm" onClick={() => { selectedItem !== undefined && handleItemClick(selectedItem); }} type="submit" style={{ color: '#EEEEEE' }}>
-          <ImCheckmark />
-        </button>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button
+            className="button square-sm"
+            onClick={() => { setShowManualInput(!showManualInput); }}
+            type="button"
+            style={{ color: '#EEEEEE' }}
+            title="Enter item name manually"
+          >
+            <BsQuestionCircle />
+          </button>
+          {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
+          <button className="button-green square-sm" onClick={() => { selectedItem !== undefined && handleItemClick(selectedItem); }} type="submit" style={{ color: '#EEEEEE' }}>
+            <ImCheckmark />
+          </button>
+        </div>
       </div>
+
+      {/* Manual item name input */}
+      {showManualInput && (
+        <div className="panel-inset" style={{ padding: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Enter item name..."
+              value={manualItemName}
+              onChange={(e) => { setManualItemName(e.target.value); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleManualItem();
+                }
+              }}
+              style={{ flex: 1, color: 'black' }}
+              ref={manualInputRef}
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="button-green square-sm"
+              onClick={handleManualItem}
+              style={{ color: '#EEEEEE' }}
+            >
+              <ImCheckmark />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

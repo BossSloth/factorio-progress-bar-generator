@@ -16,6 +16,19 @@ const server = serve({
 
     chromeDevToolsAutomaticWorkspaceFolders: true,
   },
+
+  fetch(req) {
+    // Serve static files from static directory
+    const url = new URL(req.url);
+    if (url.pathname.startsWith('/static/')) {
+      return new Response(Bun.file(`.${url.pathname}`));
+    }
+
+    // Fallback to index.html for SPA routing
+    return new Response(index.index, {
+      headers: { 'Content-Type': 'text/html' },
+    });
+  },
 });
 
 console.log(`🚀 Server running at ${server.url}`);
