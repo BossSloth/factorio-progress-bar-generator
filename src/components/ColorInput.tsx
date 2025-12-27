@@ -11,7 +11,7 @@ export function ColorInput({ onChange, value }: ColorInputProps): JSX.Element {
       <input
         type="color"
         value={value.startsWith('#') ? value : `#${value}`}
-        onChange={(e) => { onChange(e.currentTarget.value); }}
+        onChange={(e) => { onChange(e.currentTarget.value.toUpperCase()); }}
         style={{
           width: 36,
           minWidth: 36,
@@ -23,9 +23,9 @@ export function ColorInput({ onChange, value }: ColorInputProps): JSX.Element {
       />
       <input
         type="text"
-        value={value}
-        onChange={(e) => { onChange(e.currentTarget.value); }}
-        placeholder="#ff0000"
+        value={value.toUpperCase()}
+        onChange={(e) => { onChange(e.currentTarget.value.toUpperCase()); }}
+        placeholder="#FF0000"
         style={{ width: '100%' }}
       />
     </div>

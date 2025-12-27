@@ -26,7 +26,7 @@ const BAR_PRESETS: BarPreset[] = [
 ];
 
 const DEFAULT_ITEM_NAME = 'automation-science-pack';
-const DEFAULT_BAR_COLOR = '#ff0000';
+const DEFAULT_BAR_COLOR = '#FF0000';
 const DEFAULT_EMPTY_CHAR = '░';
 const DEFAULT_FILL_SCALE = ['█'];
 
@@ -323,13 +323,18 @@ export function App(): JSX.Element {
                 <dt>Bar length</dt>
                 <dd>
                   <input
-                    type="text"
+                    type="number"
                     name="bar-length"
                     value={String(barLength)}
-                    onChange={handleInputChange((value) => { setBarLength(Number(value)); })}
-                    placeholder="28"
+                    onChange={handleInputChange((value) => {
+                      if (!isNaN(Number(value)) && value !== '') {
+                        const num = value === '' ? 0 : Number(value);
+                        setBarLength(num);
+                      }
+                    })}
+                    placeholder="26"
                   />
-                  <div className="smaller mt8">Recommended: {recommendedBarLength}</div>
+                  <div className="smaller mt8" title="Based on your fill character to show a different bar per percentage value">Recommended: {recommendedBarLength} ⓘ</div>
                 </dd>
 
                 <dt>Bar style</dt>

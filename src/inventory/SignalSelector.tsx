@@ -376,12 +376,12 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
                       <div className="slot-empty" />
                     </div>
                   ))))}
-          {filteredRows.length === 0 && (
-            <div style={{ padding: 16, color: '#888', textAlign: 'center', width: '100%' }}>
-              No items found
-            </div>
-          )}
         </div>
+        {filteredRows.flatMap(row => row.items).filter(Boolean).length === 0 && (
+          <div className="no-items-found">
+            No items found
+          </div>
+        )}
       </div>
 
       {/* Quality selector */}
