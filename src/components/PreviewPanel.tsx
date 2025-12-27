@@ -1,53 +1,63 @@
-import { type ChangeEvent, JSX } from 'react';
+import type { Item } from '@/lib/generated/inventory-data';
+import { JSX, useEffect, useState } from 'react';
+import { makeBar } from '../App';
+import { ItemRenderer } from './ItemRenderer';
+import './preview-panel.css';
 
 interface PreviewPanelProps {
-  onPreviewPercentChange(value: number): void;
+  readonly barColor: string;
+  readonly barLength: number;
+  readonly emptyChar: string;
+  readonly fillScale: string[];
+  readonly item: Item;
   readonly maxPercent: number;
-  readonly previewPercent: number;
-  readonly previewText: string;
-}
-
-function handleInputChange(handler: (value: string) => void): (e: ChangeEvent<HTMLInputElement>) => void {
-  return (e: ChangeEvent<HTMLInputElement>) => {
-    handler(e.currentTarget.value);
-  };
 }
 
 export function PreviewPanel({
-  previewPercent,
-  previewText,
+  barColor,
+  barLength,
+  emptyChar,
+  fillScale,
+  item,
   maxPercent,
-  onPreviewPercentChange,
 }: PreviewPanelProps): JSX.Element {
+  const [previewPercent, setPreviewPercent] = useState(40);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPreviewPercent((prev) => {
+        const next = prev + 1;
+        if (next > maxPercent) return 0;
+        if (next === 50) return 51;
+
+        return next;
+      });
+    }, 50);
+
+    return (): void => {
+      clearInterval(interval);
+    };
+  }, [maxPercent]);
+
+  const bar = makeBar(previewPercent, maxPercent, barLength, fillScale, emptyChar);
+
   return (
     <div className="panel">
       <h3>Preview</h3>
-      <dl className="panel-hole">
-        <dt>Preview percent</dt>
-        <dd>
-          <input
-            type="range"
-            name="preview-percent-range"
-            value={String(previewPercent)}
-            onChange={handleInputChange((value) => { onPreviewPercentChange(Number(value)); })}
-            placeholder="42"
-            min={0}
-            max={maxPercent}
-          />
-          <input
-            type="text"
-            name="preview-percent-text"
-            value={String(previewPercent)}
-            onChange={handleInputChange((value) => { onPreviewPercentChange(Number(value)); })}
-            placeholder="42"
-            min={0}
-            max={maxPercent}
-          />
-        </dd>
-      </dl>
-      <div className="panel-hole">
-        <div className="panel-hole-inner">
-          <pre style={{ margin: 0 }}>{previewText}</pre>
+      <div className="panel-hole preview-panel">
+        <div className="preview-panel-content">
+          <div className="preview-bar-container">
+            <div className="preview-bar-item">
+              <ItemRenderer item={item} />
+            </div>
+            <div className="preview-bar-text" style={{ color: barColor }}>
+              {bar}
+            </div>
+            <div className="preview-bar-percent">{previewPercent}%</div>
+          </div>
+          <div className="preview-display-item">
+            <ItemRenderer item={item} />
+          </div>
         </div>
       </div>
     </div>

@@ -74,7 +74,7 @@ function firstNonWhitespaceChar(value: string, fallback: string): string {
   return toNonWhitespaceChars(value)[0] ?? fallback;
 }
 
-function makeBar(
+export function makeBar(
   percent: number,
   maxPercent: number,
   length: number,
@@ -117,7 +117,7 @@ function makeDisplayPanelText({
   readonly percent: number;
   readonly trailingSpacer: string;
 }): string {
-  return `[font=${font}][color=${colorHex}]${itemTag}${bar}${trailingSpacer}[/color][/font]${percent}%`;
+  return `[font=${font}][color=${colorHex}]${itemTag} ${bar}${trailingSpacer}[/color][/font]${percent}%`;
 }
 
 type ValueChangeHandler = (value: string) => void;
@@ -171,7 +171,6 @@ export function App(): JSX.Element {
   const [font, setFont] = useState('technology-slot-level-font');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trailingSpacer, setTrailingSpacer] = useState('⠀');
-  const [previewPercent, setPreviewPercent] = useState(42);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -269,25 +268,6 @@ export function App(): JSX.Element {
     return encodePlan(blueprint);
   }, [font, safeInputs, trailingSpacer]);
 
-  const previewText = useMemo(() => {
-    const { safeBarLength, safeBarColor, safeFillScale, safeEmptyChar, itemTag } = safeInputs;
-    let safePercent = clampInt(previewPercent, 0, MAX_PERCENT);
-    const bar = makeBar(safePercent, MAX_PERCENT, safeBarLength, safeFillScale, safeEmptyChar);
-    if (safePercent === 50) {
-      setPreviewPercent(51);
-      safePercent = 51;
-    }
-
-    return makeDisplayPanelText({
-      bar,
-      colorHex: safeBarColor,
-      font,
-      itemTag,
-      percent: safePercent,
-      trailingSpacer,
-    });
-  }, [font, previewPercent, safeInputs, trailingSpacer]);
-
   function copy(): void {
     // eslint-disable-next-line no-void
     void navigator.clipboard.writeText(blueprintString);
@@ -375,21 +355,23 @@ export function App(): JSX.Element {
 
                 <dt>Empty char</dt>
                 <dd>
-                  <input type="text" name="empty-char" value={emptyChar} onChange={handleInputChange(setEmptyChar)} />
+                  <input type="text" name="empty-char" value={emptyChar} maxLength={1} onChange={handleInputChange(setEmptyChar)} />
                 </dd>
               </dl>
               <Checkbox checked={syncItems} onChange={setSyncItems} label="Keep condition item and text item in sync" />
             </div>
-
-            <PreviewPanel
-              previewPercent={previewPercent}
-              previewText={previewText}
-              maxPercent={MAX_PERCENT}
-              onPreviewPercentChange={setPreviewPercent}
-            />
           </div>
 
           <div>
+            <PreviewPanel
+              barColor={safeInputs.safeBarColor}
+              barLength={safeInputs.safeBarLength}
+              emptyChar={safeInputs.safeEmptyChar}
+              fillScale={safeInputs.safeFillScale}
+              item={textItem}
+              maxPercent={MAX_PERCENT}
+            />
+
             <div className="panel">
               <h3>Blueprint string</h3>
               <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 260, resize: 'vertical' }} />

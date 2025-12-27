@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "./factorio.css";
 
+@font-face {
+  font-family: "Noto Sans CJK";
+  src: url("./fonts/NotoSansCJKsc-Bold.ttf");
+}
 
 .quality::after {
   content: "";
