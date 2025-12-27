@@ -149,9 +149,9 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
 
     if (!selectedItem) return;
 
+    setManualItemName(selectedItem.internalName);
     const existingItem = getItem(selectedItem.internalName);
     if (!existingItem) {
-      setManualItemName(selectedItem.internalName);
       setShowManualInput(true);
       if (manualInputRef.current) {
         manualInputRef.current.focus();
