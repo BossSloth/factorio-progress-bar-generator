@@ -45,8 +45,8 @@ export function PreviewPanel({
   const bar = makeBar(previewPercent, maxPercent, barLength, fillScale, emptyChar);
 
   return (
-    <div className="panel">
-      <h3>Preview</h3>
+    <div className="panel h100">
+      <h3 title="Preview is not 100% accurate some characters like ░ look different in-game. The bar also stays the same width in-game.">Preview*</h3>
       <div className="panel-hole preview-panel">
         <div className="preview-panel-content">
           <div className="preview-bar-container">
@@ -65,7 +65,7 @@ export function PreviewPanel({
       </div>
 
       <dl className="panel-hole preview-controls">
-        <dd style={{ width: '100%' }}>
+        <dd style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', height: '52px' }}>
           <label className="checkbox-label">
             <input
               type="checkbox"

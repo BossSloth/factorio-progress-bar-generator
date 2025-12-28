@@ -19,18 +19,21 @@ interface BarPreset {
 }
 
 const BAR_PRESETS: BarPreset[] = [
-  { id: 'squares', label: 'Squares', fillChar: '▏▎▍▌▋▊▉█', emptyChar: '░' },
-  { id: 'blocks', label: 'Blocks', fillChar: '▎▌▊█', emptyChar: '░' },
-  { id: 'shades', label: 'Shades', fillChar: '░▒▓█', emptyChar: '░' },
-  { id: 'lines', label: 'Lines', fillChar: '━', emptyChar: '─' },
-  { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '○' },
-  { id: 'circles', label: 'Circles', fillChar: '◐◓◑◒●', emptyChar: '○' },
+  { id: 'blocks', label: 'Blocks', fillChar: '▎▌▊█', emptyChar: '⠀' },
+  { id: 'blocks-background', label: 'Blocks background', fillChar: '▎▌▊█', emptyChar: '░' },
+  { id: 'eighths', label: 'Eighth Blocks', fillChar: '▏▎▍▌▋▊▉█', emptyChar: '⠀' },
+  { id: 'eighths-background', label: 'Eighth Blocks background', fillChar: '▏▎▍▌▋▊▉█', emptyChar: '░' },
+  { id: 'shades', label: 'Gradient Shades', fillChar: '░▒▓█', emptyChar: '░' },
+  { id: 'lines', label: 'Horizontal Line', fillChar: '━', emptyChar: '─' },
+  { id: 'pie', label: 'Pie Chart', fillChar: '◔◑◕●', emptyChar: '○' },
+  { id: 'spinner', label: 'Rotating Spinner', fillChar: '◐◓◑◒●', emptyChar: '○' },
   { id: 'triangles', label: 'Triangles', fillChar: '▲', emptyChar: '△' },
   { id: 'diamonds', label: 'Diamonds', fillChar: '◆', emptyChar: '◇' },
   { id: 'arrows', label: 'Arrows', fillChar: '►', emptyChar: '▻' },
-  { id: 'dots', label: 'Dots', fillChar: '●', emptyChar: '○' },
-  { id: 'battery', label: 'Battery', fillChar: '▰', emptyChar: '▱' },
-  { id: 'braille', label: 'Braille', fillChar: '⣄⣤⣦⣶⣷⣿', emptyChar: '⣀' },
+  { id: 'dots', label: 'Filled Dots', fillChar: '●', emptyChar: '○' },
+  { id: 'battery', label: 'Battery Meter', fillChar: '▰', emptyChar: '▱' },
+  { id: 'braille', label: 'Braille Pattern', fillChar: '⣄⣤⣦⣶⣷⣿', emptyChar: '⣀' },
+  { id: 'braille-minimal', label: 'Braille Pattern (minimal)', fillChar: '⣄⣤⣦⣶⣷⣿', emptyChar: '⠀' },
 ];
 
 const DEFAULT_ITEM_NAME = 'automation-science-pack';
@@ -122,9 +125,12 @@ function makeDisplayPanelText({
   readonly colorHex: string;
   readonly font: string;
   readonly itemTag: string;
-  readonly percent: number;
+  readonly percent: number | string;
   readonly trailingSpacer: string;
 }): string {
+  if (Number(percent) < 10) percent = `0${percent}`;
+  if (Number(percent) === 100) trailingSpacer = '';
+
   return `[font=${font}][color=${colorHex}]${itemTag} ${bar}${trailingSpacer}[/color][/font]${percent}%`;
 }
 
@@ -291,17 +297,17 @@ export function App(): JSX.Element {
 
   return (
     <div className="container">
-      <div className="container-inner">
+      <div className="container-inner flex flex-column">
         <div className="panel">
           <h2>Progress Bar Generator</h2>
           <p>Generates a display panel blueprint with conditional text for each percent.</p>
         </div>
 
-        <div className="panels2">
+        <div className="panels2 mb12">
           <div>
-            <div className="panel">
+            <div className="panel h100">
               <h3>Settings</h3>
-              <dl className="panel-hole">
+              <dl className="panel-hole" style={{ height: '89%' }}>
                 <dt>Condition signal</dt>
                 <dd>
                   <button
@@ -389,16 +395,16 @@ export function App(): JSX.Element {
               maxPercent={MAX_PERCENT}
             />
 
-            <div className="panel">
-              <h3>Blueprint string</h3>
-              <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 260, resize: 'vertical', color: 'black' }} />
-              <div className="mt8 flex flex-items-center">
-                <button type="button" className="button-green" onClick={copy}>
-                  {copied ? 'Copied!' : 'Copy to clipboard'}
-                </button>
-                <div className="ml8 smaller">Paste in Factorio: Ctrl+V</div>
-              </div>
-            </div>
+          </div>
+        </div>
+        <div className="panel">
+          <h3>Blueprint string</h3>
+          <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 100, resize: 'vertical', color: 'black' }} />
+          <div className="mt8 flex flex-items-center">
+            <button type="button" className="button-green" onClick={copy}>
+              {copied ? 'Copied!' : 'Copy to clipboard'}
+            </button>
+            <div className="ml8 smaller">Paste in Factorio: Ctrl+V</div>
           </div>
         </div>
       </div>

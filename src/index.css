@@ -3,7 +3,7 @@
 
 @font-face {
   font-family: "Noto Sans CJK";
-  src: url("./fonts/NotoSansCJKsc-Bold.ttf");
+  src: url("./fonts/NotoSansCJKtc-Bold.ttf");
 }
 
 .quality::after {
