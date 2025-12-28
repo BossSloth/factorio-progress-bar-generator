@@ -5,9 +5,10 @@ import { ColorInput } from './components/ColorInput';
 import { DraggablePopup } from './components/DraggablePopup';
 import { ItemRenderer } from './components/ItemRenderer';
 import { PreviewPanel } from './components/PreviewPanel';
+import { getCounterPlan } from './example-blueprints/counter-blueprint';
 import './index.css';
 import { getItem, SignalSelector } from './inventory/SignalSelector';
-import { addEntity, createEmptyBlueprint, encodePlan, type Comparator, type Icon } from './lib/blueprints';
+import { addEntity, createEmptyBlueprint, encodePlan, EntityControlBehaviour, type Icon } from './lib/blueprints';
 import { Quality } from './lib/blueprints/quality';
 import type { InventoryItem, Item } from './lib/generated/inventory-data';
 
@@ -178,14 +179,17 @@ export function App(): JSX.Element {
   const [selectorTarget, setSelectorTarget] = useState<'condition' | 'text' | null>(null);
   const [barColorHex, setBarColorHex] = useState(DEFAULT_BAR_COLOR);
   const [barPresetId, setBarPresetId] = useState<string>('blocks');
-  const [fillChar, setFillChar] = useState('█');
-  const [emptyChar, setEmptyChar] = useState(DEFAULT_EMPTY_CHAR);
+  const [fillChar, setFillChar] = useState('');
+  const [emptyChar, setEmptyChar] = useState('');
   const [barLength, setBarLength] = useState(26);
+  // TODO: maybe use someday
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [font, setFont] = useState('technology-slot-level-font');
+  // TODO: maybe use someday
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trailingSpacer, setTrailingSpacer] = useState('⠀');
   const [copied, setCopied] = useState(false);
+  const [includeCounter, setIncludeCounter] = useState(false);
 
   useEffect(() => {
     if (!syncItems) return;
@@ -233,8 +237,13 @@ export function App(): JSX.Element {
     };
   }, [barColorHex, barLength, textItem, emptyChar, fillChar]);
 
+  const counterPlan = useMemo(() => {
+    if (!includeCounter) return null;
+
+    return getCounterPlan(textItem);
+  }, [includeCounter, textItem]);
+
   const blueprintString = useMemo(() => {
-    const comparator: Comparator = '≤';
     const {
       safeBarLength,
       safeBarColor,
@@ -256,7 +265,7 @@ export function App(): JSX.Element {
 
     addEntity(blueprint, {
       name: 'display-panel',
-      position: { x: 0, y: 0 },
+      position: { x: 0.5, y: 0.5 },
       always_show: true,
       direction: 8,
       control_behavior: {
@@ -274,17 +283,22 @@ export function App(): JSX.Element {
             }),
             icon: { name: textItem.internalName, quality: textItem.quality },
             condition: {
-              comparator,
+              comparator: '≤',
               constant: percent,
               first_signal: { name: conditionItem.internalName, quality: conditionItem.quality },
             },
-          };
+          } as NonNullable<EntityControlBehaviour['parameters']>[number];
         }),
       },
     });
 
+    if (counterPlan) {
+      blueprint.blueprint.entities = [...blueprint.blueprint.entities ?? [], ...counterPlan.entities ?? []];
+      blueprint.blueprint.wires = counterPlan.wires;
+    }
+
     return encodePlan(blueprint);
-  }, [font, safeInputs, trailingSpacer]);
+  }, [conditionItem.internalName, conditionItem.quality, font, includeCounter, safeInputs, textItem, trailingSpacer]);
 
   function copy(): void {
     // eslint-disable-next-line no-void
@@ -398,7 +412,16 @@ export function App(): JSX.Element {
           </div>
         </div>
         <div className="panel">
-          <h3>Blueprint string</h3>
+          <div className="flex flex-items-center flex-justify-between">
+            <h3>Blueprint string</h3>
+            <div className="ml16 mb8" title="Adds a constant combinator and a decider combinator to automatically count up. Great for testing the progress bar.">
+              <Checkbox
+                checked={includeCounter}
+                onChange={setIncludeCounter}
+                label="Include counter ⓘ"
+              />
+            </div>
+          </div>
           <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 100, resize: 'vertical', color: 'black' }} />
           <div className="mt8 flex flex-items-center">
             <button type="button" className="button-green" onClick={copy}>

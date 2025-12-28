@@ -15,153 +15,7 @@ export interface Entity {
   direction?: number;
   enable_logistics_while_moving?: boolean;
   orientation?: number;
-  control_behavior?: {
-    circuit_enabled?: boolean;
-    circuit_condition?: CircuitCondition;
-    circuit_condition_enabled?: boolean;
-    connect_to_logistic_network?: boolean;
-    logistic_condition?: CircuitCondition;
-    sections?: null | {
-      sections: Array<{
-        /** 1-based */
-        index: number;
-        filters?: Array<
-          ItemFilter & {
-            count?: number;
-            type?: string;
-          }
-        >;
-        group?: string;
-      }>;
-    };
-    is_on?: boolean;
-    circuit_mode_of_operation?: number;
-    /** used by programmable speaker */
-    circuit_parameters?: {
-      signal_value_is_pitch: boolean;
-      instrument_id: number;
-      note_id: number;
-    };
-    send_to_train?: boolean;
-    read_from_train?: boolean;
-    read_stopped_train?: boolean;
-    train_stopped_signal?: Signal;
-    set_trains_limit?: boolean;
-    trains_limit_signal?: Signal;
-    read_trains_count?: boolean;
-    trains_count_signal?: Signal;
-    set_priority?: boolean;
-    priority_signal?: Signal;
-    output_signal?: Signal;
-
-    circuit_read_hand_contents?: boolean;
-    /**
-     * @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior
-     */
-    circuit_hand_read_mode?: number;
-    /**
-     * @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior
-     */
-    circuit_contents_read_mode?: number;
-
-    // Roboport
-    read_items_mode?: number;
-    read_robot_stats?: boolean;
-    available_logistic_output_signal?: Signal;
-    total_logistic_output_signal?: Signal;
-    available_construction_output_signal?: Signal;
-    total_construction_output_signal?: Signal;
-    roboport_count_output_signal?: Signal;
-
-    /** used by pump */
-    set_filter?: boolean;
-
-    /** used by inserter */
-    circuit_set_filters?: boolean;
-    circuit_set_stack_size?: boolean;
-    stack_control_input_signal?: Signal;
-
-    // train signals
-    circuit_close_signal?: boolean;
-    circuit_read_signal?: boolean;
-    red_output_signal?: null | Signal;
-    orange_output_signal?: null | Signal;
-    green_output_signal?: null | Signal;
-
-    // gate
-    circuit_open_gate?: boolean;
-    circuit_read_sensor?: boolean;
-
-    // assembling machine
-    set_recipe?: boolean;
-    read_contents?: boolean;
-    read_working?: boolean;
-    working_signal?: Signal;
-    read_ingredients?: boolean;
-    read_recipe_finished?: boolean;
-    recipe_finished_signal?: Signal;
-
-    read_burner_fuel?: boolean;
-    read_temperature?: boolean;
-    temperature_signal?: Signal;
-
-    arithmetic_conditions?: {
-      operation: Operator;
-      first_signal_networks?: {
-        red: boolean;
-        green: boolean;
-      };
-      second_signal_networks?: {
-        red: boolean;
-        green: boolean;
-      };
-      first_signal?: Signal;
-      first_constant?: number;
-      second_signal?: Signal;
-      second_constant?: number;
-      output_signal?: Signal;
-    };
-
-    decider_conditions?: {
-      conditions: null | Array<
-        CircuitCondition & {
-          first_signal_networks?: {
-            red: boolean;
-            green: boolean;
-          };
-          second_signal_networks?: {
-            red: boolean;
-            green: boolean;
-          };
-          compare_type?: 'and' | 'or';
-        }
-      >;
-      outputs: null | Array<{
-        signal?: Signal;
-        copy_count_from_input?: boolean;
-        networks?: {
-          red: boolean;
-          green: boolean;
-        };
-      }>;
-    };
-
-    // lamp settings
-    use_colors?: boolean;
-    red_signal?: Signal;
-    green_signal?: Signal;
-    blue_signal?: Signal;
-    rgb_signal?: Signal;
-    /** @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior */
-    color_mode?: number;
-
-    /** Display panel parameters */
-    parameters?: Array<{
-      condition: CircuitCondition;
-      icon: Signal;
-      text: string;
-    }>;
-  };
+  control_behavior?: EntityControlBehaviour;
 
   /** used by display panel */
   always_show?: boolean;
@@ -306,4 +160,152 @@ export interface Entity {
 
   // switch
   switch_state?: boolean;
+}
+
+export interface EntityControlBehaviour {
+  circuit_enabled?: boolean;
+  circuit_condition?: CircuitCondition;
+  circuit_condition_enabled?: boolean;
+  connect_to_logistic_network?: boolean;
+  logistic_condition?: CircuitCondition;
+  sections?: null | {
+    sections: Array<{
+      /** 1-based */
+      index: number;
+      filters?: Array<
+        ItemFilter & {
+          count?: number;
+          type?: string;
+        }
+      >;
+      group?: string;
+    }>;
+  };
+  is_on?: boolean;
+  circuit_mode_of_operation?: number;
+  /** used by programmable speaker */
+  circuit_parameters?: {
+    signal_value_is_pitch: boolean;
+    instrument_id: number;
+    note_id: number;
+  };
+  send_to_train?: boolean;
+  read_from_train?: boolean;
+  read_stopped_train?: boolean;
+  train_stopped_signal?: Signal;
+  set_trains_limit?: boolean;
+  trains_limit_signal?: Signal;
+  read_trains_count?: boolean;
+  trains_count_signal?: Signal;
+  set_priority?: boolean;
+  priority_signal?: Signal;
+  output_signal?: Signal;
+
+  circuit_read_hand_contents?: boolean;
+  /**
+     * @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior
+     */
+  circuit_hand_read_mode?: number;
+  /**
+     * @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior
+     */
+  circuit_contents_read_mode?: number;
+
+  // Roboport
+  read_items_mode?: number;
+  read_robot_stats?: boolean;
+  available_logistic_output_signal?: Signal;
+  total_logistic_output_signal?: Signal;
+  available_construction_output_signal?: Signal;
+  total_construction_output_signal?: Signal;
+  roboport_count_output_signal?: Signal;
+
+  /** used by pump */
+  set_filter?: boolean;
+
+  /** used by inserter */
+  circuit_set_filters?: boolean;
+  circuit_set_stack_size?: boolean;
+  stack_control_input_signal?: Signal;
+
+  // train signals
+  circuit_close_signal?: boolean;
+  circuit_read_signal?: boolean;
+  red_output_signal?: null | Signal;
+  orange_output_signal?: null | Signal;
+  green_output_signal?: null | Signal;
+
+  // gate
+  circuit_open_gate?: boolean;
+  circuit_read_sensor?: boolean;
+
+  // assembling machine
+  set_recipe?: boolean;
+  read_contents?: boolean;
+  read_working?: boolean;
+  working_signal?: Signal;
+  read_ingredients?: boolean;
+  read_recipe_finished?: boolean;
+  recipe_finished_signal?: Signal;
+
+  read_burner_fuel?: boolean;
+  read_temperature?: boolean;
+  temperature_signal?: Signal;
+
+  arithmetic_conditions?: {
+    operation: Operator;
+    first_signal_networks?: {
+      red: boolean;
+      green: boolean;
+    };
+    second_signal_networks?: {
+      red: boolean;
+      green: boolean;
+    };
+    first_signal?: Signal;
+    first_constant?: number;
+    second_signal?: Signal;
+    second_constant?: number;
+    output_signal?: Signal;
+  };
+
+  decider_conditions?: {
+    conditions: null | Array<
+      CircuitCondition & {
+        first_signal_networks?: {
+          red: boolean;
+          green: boolean;
+        };
+        second_signal_networks?: {
+          red: boolean;
+          green: boolean;
+        };
+        compare_type?: 'and' | 'or';
+      }
+    >;
+    outputs: null | Array<{
+      signal?: Signal;
+      copy_count_from_input?: boolean;
+      networks?: {
+        red: boolean;
+        green: boolean;
+      };
+    }>;
+  };
+
+  // lamp settings
+  use_colors?: boolean;
+  red_signal?: Signal;
+  green_signal?: Signal;
+  blue_signal?: Signal;
+  rgb_signal?: Signal;
+  /** @see https://lua-api.factorio.com/latest/defines.html#defines.control_behavior */
+  color_mode?: number;
+
+  /** Display panel parameters */
+  parameters?: Array<{
+    condition: CircuitCondition;
+    icon: Signal;
+    text: string;
+  }>;
 }

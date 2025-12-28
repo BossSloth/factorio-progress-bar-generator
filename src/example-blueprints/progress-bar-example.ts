@@ -1,4 +1,4 @@
-import { Plan } from './lib/blueprints';
+import { Plan } from '../lib/blueprints';
 
 export const progressBarExamplePlan: Plan = {
   blueprint: {

@@ -46,7 +46,7 @@ export function PreviewPanel({
 
   return (
     <div className="panel h100">
-      <h3 title="Preview is not 100% accurate some characters like ░ look different in-game. The bar also stays the same width in-game.">Preview*</h3>
+      <h3 title="Preview is not 100% accurate some characters like ░ look different in-game. The bar also stays the same width in-game, unlike in the preview.">Preview*</h3>
       <div className="panel-hole preview-panel">
         <div className="preview-panel-content">
           <div className="preview-bar-container">
