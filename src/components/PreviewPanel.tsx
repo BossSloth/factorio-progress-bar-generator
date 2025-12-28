@@ -22,8 +22,11 @@ export function PreviewPanel({
   maxPercent,
 }: PreviewPanelProps): JSX.Element {
   const [previewPercent, setPreviewPercent] = useState(40);
+  const [autoIncrement, setAutoIncrement] = useState(true);
 
   useEffect(() => {
+    if (!autoIncrement) return undefined;
+
     const interval = setInterval(() => {
       setPreviewPercent((prev) => {
         const next = prev + 1;
@@ -37,7 +40,7 @@ export function PreviewPanel({
     return (): void => {
       clearInterval(interval);
     };
-  }, [maxPercent]);
+  }, [maxPercent, autoIncrement]);
 
   const bar = makeBar(previewPercent, maxPercent, barLength, fillScale, emptyChar);
 
@@ -60,6 +63,46 @@ export function PreviewPanel({
           </div>
         </div>
       </div>
+
+      <dl className="panel-hole preview-controls">
+        <dd style={{ width: '100%' }}>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={autoIncrement}
+              onChange={(e): void => { setAutoIncrement(e.target.checked); }}
+            />
+            <div className="checkbox" />
+            <div>Auto Increment</div>
+          </label>
+          {!autoIncrement && (
+            <div className="preview-slider-container">
+              <input
+                type="range"
+                className="preview-slider"
+                min="0"
+                max={maxPercent}
+                value={previewPercent}
+                onChange={(e): void => { setPreviewPercent(Number(e.target.value)); }}
+                // @ts-expect-error stupid css variables
+                style={{ '--value': `${previewPercent}`, '--max': `${maxPercent}`, '--min': '0' }}
+              />
+              <input
+                type="text"
+                className="preview-slider-value"
+                value={`${previewPercent}%`}
+                onChange={(e): void => {
+                  const value = e.target.value.replace('%', '');
+                  const numValue = Number(value);
+                  if (!isNaN(numValue)) {
+                    setPreviewPercent(Math.max(0, Math.min(maxPercent, numValue)));
+                  }
+                }}
+              />
+            </div>
+          )}
+        </dd>
+      </dl>
     </div>
   );
 }

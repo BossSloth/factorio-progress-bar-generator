@@ -19,10 +19,18 @@ interface BarPreset {
 }
 
 const BAR_PRESETS: BarPreset[] = [
+  { id: 'squares', label: 'Squares', fillChar: '▏▎▍▌▋▊▉█', emptyChar: '░' },
   { id: 'blocks', label: 'Blocks', fillChar: '▎▌▊█', emptyChar: '░' },
-  { id: 'hash', label: 'Hash', fillChar: '#', emptyChar: '-' },
+  { id: 'shades', label: 'Shades', fillChar: '░▒▓█', emptyChar: '░' },
   { id: 'lines', label: 'Lines', fillChar: '━', emptyChar: '─' },
   { id: 'clocks', label: 'Clocks', fillChar: '◔◑◕●', emptyChar: '○' },
+  { id: 'circles', label: 'Circles', fillChar: '◐◓◑◒●', emptyChar: '○' },
+  { id: 'triangles', label: 'Triangles', fillChar: '▲', emptyChar: '△' },
+  { id: 'diamonds', label: 'Diamonds', fillChar: '◆', emptyChar: '◇' },
+  { id: 'arrows', label: 'Arrows', fillChar: '►', emptyChar: '▻' },
+  { id: 'dots', label: 'Dots', fillChar: '●', emptyChar: '○' },
+  { id: 'battery', label: 'Battery', fillChar: '▰', emptyChar: '▱' },
+  { id: 'braille', label: 'Braille', fillChar: '⣄⣤⣦⣶⣷⣿', emptyChar: '⣀' },
 ];
 
 const DEFAULT_ITEM_NAME = 'automation-science-pack';
@@ -198,6 +206,10 @@ export function App(): JSX.Element {
     const safeMaxPercent = MAX_PERCENT + 2;
     const fillScaleLength = toNonWhitespaceChars(fillChar).length || 1;
 
+    if (fillScaleLength === 1) {
+      return 51;
+    }
+
     return Math.ceil(safeMaxPercent / fillScaleLength);
   }, [fillChar]);
 
@@ -334,14 +346,14 @@ export function App(): JSX.Element {
                     })}
                     placeholder="26"
                   />
-                  <div className="smaller mt8" title="Based on your fill character to show a different bar per percentage value">Recommended: {recommendedBarLength} ⓘ</div>
+                  <div className="smaller mt8" title="The recommended length is calculated based on your fill characters count to ensure at least one full character per percentage point">Suggested length: {recommendedBarLength} ⓘ</div>
                 </dd>
 
-                <dt>Bar style</dt>
+                <dt>Bar presets</dt>
                 <dd>
                   <select
                     className="button"
-                    name="bar-style"
+                    name="bar-presets"
                     value={barPresetId}
                     onChange={handleSelectChange(setBarPresetId)}
                   >
@@ -353,12 +365,12 @@ export function App(): JSX.Element {
                   </select>
                 </dd>
 
-                <dt>Fill char</dt>
+                <dt title="The fill character(s) used to draw the progress bar. The order determines the progression from empty to full per character. Using characters that have the same width is recommended for consistent appearance.">Fill char ⓘ</dt>
                 <dd>
                   <input type="text" name="fill-char" value={fillChar} onChange={handleInputChange(setFillChar)} />
                 </dd>
 
-                <dt>Empty char</dt>
+                <dt title="The empty character used to draw the empty portion of the progress bar. Should be a single character with the same width as the fill characters.">Empty char ⓘ</dt>
                 <dd>
                   <input type="text" name="empty-char" value={emptyChar} maxLength={1} onChange={handleInputChange(setEmptyChar)} />
                 </dd>
@@ -379,7 +391,7 @@ export function App(): JSX.Element {
 
             <div className="panel">
               <h3>Blueprint string</h3>
-              <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 260, resize: 'vertical' }} />
+              <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 260, resize: 'vertical', color: 'black' }} />
               <div className="mt8 flex flex-items-center">
                 <button type="button" className="button-green" onClick={copy}>
                   {copied ? 'Copied!' : 'Copy to clipboard'}
