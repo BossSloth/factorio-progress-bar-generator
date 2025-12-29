@@ -308,30 +308,31 @@ export function App(): JSX.Element {
 
   return (
     <div className="container">
-      <div className="container-inner flex flex-column">
+      <main className="container-inner flex flex-column">
         <div className="panel">
-          <h2>Progress Bar Generator</h2>
+          <h1>Progress Bar Generator</h1>
           <p>Generates a display panel blueprint with conditional text for each percent.</p>
         </div>
 
         <div className="panels2 mb12">
           <div>
             <div className="panel h100">
-              <h3>Settings</h3>
+              <h2>Settings</h2>
               <dl className="panel-hole" style={{ height: '89%' }}>
-                <dt>Condition signal</dt>
+                <dt id="condition-signal-label">Condition signal</dt>
                 <dd>
                   <button
                     type="button"
                     className={classNames('button square-m', { active: selectorTarget === 'condition' })}
                     onClick={() => { setSelectorTarget('condition'); }}
                     style={{ padding: 4 }}
+                    aria-labelledby="condition-signal-label"
                   >
                     <ItemRenderer item={conditionItem} />
                   </button>
                 </dd>
 
-                <dt>Text signal</dt>
+                <dt id="text-signal-label">Text signal</dt>
                 <dd>
                   <button
                     type="button"
@@ -339,17 +340,18 @@ export function App(): JSX.Element {
                     disabled={syncItems}
                     onClick={() => { setSelectorTarget('text'); }}
                     style={{ padding: 4 }}
+                    aria-labelledby="text-signal-label"
                   >
                     <ItemRenderer item={textItem} />
                   </button>
                 </dd>
 
-                <dt>Bar color</dt>
+                <dt id="bar-color-label">Bar color</dt>
                 <dd>
-                  <ColorInput value={barColorHex} onChange={setBarColorHex} />
+                  <ColorInput value={barColorHex} onChange={setBarColorHex} ariaLabelledBy="bar-color-label" />
                 </dd>
 
-                <dt>Bar length</dt>
+                <dt id="bar-length-label">Bar length</dt>
                 <dd>
                   <input
                     type="number"
@@ -362,17 +364,19 @@ export function App(): JSX.Element {
                       }
                     })}
                     placeholder="26"
+                    aria-labelledby="bar-length-label"
                   />
-                  <div className="smaller mt8" title="The recommended length is calculated based on your fill characters count to ensure at least one full character per percentage point">Suggested length: {recommendedBarLength} ⓘ</div>
+                  <div className="smaller mt8" title="The recommended length is calculated based on your fill characters count to ensure at least one full character per percentage point">Suggested length: {recommendedBarLength} 🛈</div>
                 </dd>
 
-                <dt>Bar presets</dt>
+                <dt id="bar-presets-label">Bar presets</dt>
                 <dd>
                   <select
                     className="button"
                     name="bar-presets"
                     value={barPresetId}
                     onChange={handleSelectChange(setBarPresetId)}
+                    aria-labelledby="bar-presets-label"
                   >
                     {BAR_PRESETS.map(p => (
                       <option key={p.id} value={p.id}>
@@ -382,14 +386,14 @@ export function App(): JSX.Element {
                   </select>
                 </dd>
 
-                <dt title="The fill character(s) used to draw the progress bar. The order determines the progression from empty to full per character. Using characters that have the same width is recommended for consistent appearance.">Fill char ⓘ</dt>
+                <dt id="fill-char-label" title="The fill character(s) used to draw the progress bar. The order determines the progression from empty to full per character. Using characters that have the same width is recommended for consistent appearance.">Fill char 🛈</dt>
                 <dd>
-                  <input type="text" name="fill-char" value={fillChar} onChange={handleInputChange(setFillChar)} />
+                  <input type="text" name="fill-char" value={fillChar} onChange={handleInputChange(setFillChar)} aria-labelledby="fill-char-label" style={{ color: barColorHex }} />
                 </dd>
 
-                <dt title="The empty character used to draw the empty portion of the progress bar. Should be a single character with the same width as the fill characters.">Empty char ⓘ</dt>
+                <dt id="empty-char-label" title="The empty character used to draw the empty portion of the progress bar. Should be a single character with the same width as the fill characters.">Empty char 🛈</dt>
                 <dd>
-                  <input type="text" name="empty-char" value={emptyChar} maxLength={1} onChange={handleInputChange(setEmptyChar)} />
+                  <input type="text" name="empty-char" value={emptyChar} maxLength={1} onChange={handleInputChange(setEmptyChar)} aria-labelledby="empty-char-label" style={{ color: barColorHex }} />
                 </dd>
               </dl>
               <Checkbox checked={syncItems} onChange={setSyncItems} label="Keep condition item and text item in sync" />
@@ -410,16 +414,22 @@ export function App(): JSX.Element {
         </div>
         <div className="panel">
           <div className="flex flex-items-center flex-justify-between">
-            <h3>Blueprint string</h3>
+            <h2>Blueprint string</h2>
             <div className="ml16 mb8" title="Adds a constant combinator and a decider combinator to automatically count up. Great for testing the progress bar.">
               <Checkbox
                 checked={includeCounter}
                 onChange={setIncludeCounter}
-                label="Include counter ⓘ"
+                label="Include counter 🛈"
               />
             </div>
           </div>
-          <textarea readOnly value={blueprintString} style={{ width: '100%', minHeight: 100, resize: 'vertical', color: 'black' }} />
+          <textarea
+            aria-label="Blueprint string"
+            readOnly
+            value={blueprintString}
+            style={{ width: '100%', minHeight: 100, resize: 'vertical', color: 'black' }}
+            id="blueprint-string"
+          />
           <div className="mt8 flex flex-items-center">
             <button type="button" className="button-green" onClick={copy}>
               {copied ? 'Copied!' : 'Copy to clipboard'}
@@ -427,7 +437,7 @@ export function App(): JSX.Element {
             <div className="ml8 smaller">Paste in Factorio: Ctrl+V</div>
           </div>
         </div>
-      </div>
+      </main>
       <DraggablePopup isOpen={selectorTarget !== null}>
         {({ isDragging, onDragStart }) => (
           <SignalSelector

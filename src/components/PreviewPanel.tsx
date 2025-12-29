@@ -46,7 +46,7 @@ export function PreviewPanel({
 
   return (
     <div className="panel h100">
-      <h3 title="Preview is not 100% accurate some characters like ░ look different in-game. The bar also stays the same width in-game, unlike in the preview.">Preview*</h3>
+      <h2 title="Preview is not 100% accurate some characters like ░ look different in-game. The bar also stays the same width in-game, unlike in the preview.">Preview*</h2>
       <div className="panel-hole preview-panel">
         <div className="preview-panel-content">
           <div className="preview-bar-container">
@@ -71,6 +71,7 @@ export function PreviewPanel({
               type="checkbox"
               checked={autoIncrement}
               onChange={(e): void => { setAutoIncrement(e.target.checked); }}
+              id="auto-increment"
             />
             <div className="checkbox" />
             <div>Auto Increment</div>
@@ -84,6 +85,7 @@ export function PreviewPanel({
                 max={maxPercent}
                 value={previewPercent}
                 onChange={(e): void => { setPreviewPercent(Number(e.target.value)); }}
+                aria-label="Preview percentage slider"
                 // @ts-expect-error stupid css variables
                 style={{ '--value': `${previewPercent}`, '--max': `${maxPercent}`, '--min': '0' }}
               />
@@ -98,6 +100,7 @@ export function PreviewPanel({
                     setPreviewPercent(Math.max(0, Math.min(maxPercent, numValue)));
                   }
                 }}
+                aria-label="Preview percentage value"
               />
             </div>
           )}

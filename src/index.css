@@ -1,10 +1,6 @@
 @import "tailwindcss";
+@import "./google-titillium-web.css";
 @import "./factorio.css";
-
-@font-face {
-  font-family: "Noto Sans CJK";
-  src: url("./fonts/NotoSansCJKtc-Bold.ttf");
-}
 
 .quality::after {
   content: "";

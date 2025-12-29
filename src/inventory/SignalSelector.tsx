@@ -279,6 +279,7 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
               onMouseDown={(e) => { e.stopPropagation(); }}
               style={{ width: 'clamp(110px, 30vw, 140px)', paddingRight: 28, color: 'black' }}
               ref={searchRef}
+              aria-label="Search signals"
             />
             <span
               style={{
@@ -299,6 +300,7 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
               className="button square-sm"
               onClick={onClose}
               onMouseDown={(e) => { e.stopPropagation(); }}
+              aria-label="Close signal selector"
             >
               ✕
             </button>
@@ -314,7 +316,8 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
           const tabClass = classNames('button square-l ml0', { active: isActive, disabled: !hasResults });
 
           return (
-            <div
+            <button
+              type="button"
               key={tab.name}
               className={tabClass}
               title={tab.name}
@@ -327,7 +330,7 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
                 src={tab.iconSrc}
                 decoding="async"
               />
-            </div>
+            </button>
           );
         })}
         <div className="slot" style={{ flex: 'unset', width: 'var(--inventory-tab-placeholder-size)', height: 'var(--inventory-tab-placeholder-size)' }}>
@@ -358,17 +361,19 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
             row.items.map((item, colIdx) =>
               (item
                 ? (
-                    <div
+                    <button
+                      type="button"
                       key={item.internalName}
                       className="slot"
                       data-item={item.internalName}
                       title={item.title}
                       onClick={() => { handleItemClick(item); }}
+                      style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'pointer' }}
                     >
                       <div className={classNames('slot-button', { selected: selectedItem?.internalName === item.internalName })}>
                         <img className="inventory-image" alt={item.title} src={item.imgSrc} decoding="async" />
                       </div>
-                    </div>
+                    </button>
                   )
                 : (
                     // eslint-disable-next-line react/no-array-index-key
@@ -394,7 +399,8 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
             const isSelected = selectedQuality === q.id;
 
             return (
-              <div
+              <button
+                type="button"
                 key={q.id}
                 className={classNames('button square-sm ml0', { active: isSelected })}
                 title={q.label}
@@ -402,7 +408,7 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
                 style={{ width: 'var(--inventory-quality-size)', height: 'var(--inventory-quality-size)', flexBasis: 'var(--inventory-quality-size)', padding: 'var(--inventory-quality-padding)' }}
               >
                 <img alt={q.label} src={q.icon} decoding="async" />
-              </div>
+              </button>
             );
           })}
         </div>
@@ -413,11 +419,12 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
             type="button"
             style={{ color: '#EEEEEE' }}
             title="Enter item name manually"
+            aria-label="Toggle manual item name input"
           >
             <BsQuestionCircle />
           </button>
           {/* eslint-disable-next-line @typescript-eslint/no-unused-expressions */}
-          <button className="button-green square-sm" onClick={() => { selectedItem !== undefined && handleItemClick(selectedItem); }} type="submit" style={{ color: '#EEEEEE' }}>
+          <button className="button-green square-sm" onClick={() => { selectedItem !== undefined && handleItemClick(selectedItem); }} type="submit" style={{ color: '#EEEEEE' }} aria-label="Confirm selection">
             <ImCheckmark />
           </button>
         </div>
@@ -440,12 +447,14 @@ export function SignalSelector({ onClose, onDragStart, onItemClick, className, i
               style={{ flex: 1, color: 'black' }}
               ref={manualInputRef}
               autoFocus
+              aria-label="Manual item name"
             />
             <button
               type="submit"
               className="button-green square-sm"
               onClick={handleManualItem}
               style={{ color: '#EEEEEE' }}
+              aria-label="Confirm item name"
             >
               <ImCheckmark />
             </button>
